@@ -69,9 +69,9 @@ def calculate_time_movements(lens, paths, speeds, nodes):
 
             for arc in arcs:
                 #print
-                lenght = float(lens[ arc[0] ][ arc[1] ])
+                lenght = lens[ arc[0] ][ arc[1] ]
                 #print('    lenght ({},{}): {}'.format(arc[0], arc[1], lenght))
-                speed = float(speeds[ arc[0] ][ arc[1] ])
+                speed = 60  #float(speeds[ arc[0] ][ arc[1] ])
                 #print('    speed ({},{}): {}'.format(arc[0], arc[1], speed))
 
                 sub_result = lenght / speed
@@ -126,18 +126,14 @@ def calculate_Dij(lens, flows, nodes):
     for i in nodes:
         Dij[i] = {}
         for j in nodes:
-            #print('i: {}; j: {}'.format(i, j))
             HPj = flows[j]['absorbtion']
-            #print('HPj: {}'.format(HPj))
+
             if i == j:
-                Cij = 0.01
+                Cij = 0.01 + 0.01 * 2   # 2 - остання цифра заліковки
             else:
                 Cij = lens[i][j]**-1
-            #print('Cij: {}'.format(Cij))
+
             result = round(HPj * Cij, 2)
-            #print('result: {}'.format(result))
-            #print('-'*50)
-            #print()
             Dij[i][j] = result
     return Dij
 
@@ -524,17 +520,19 @@ def write_table30x30(ws, name, data):
         cell.font = font
 
         # row index
+        # +2 in order to save space for title and column names
         row = column
         cell = ws.cell(row=row+2, column=1, value=row)
         cell.border = border
         cell.font = font
-
     # writing data into sheet
     for i in nodes:
         for j in nodes:
             row = int(i) + 2    # to compensate header
             column = int(j) + 1     # to compensate row indexes
             value = data[i].get(j, '')
+            if type(value) == list:
+                value = '>'.join(value) or '-'
             cell = ws.cell(row=row, column=column, value=value)
             cell.border = border
 
@@ -563,7 +561,7 @@ def build_chart(ws):
     return ws
 
 
-def write2excel(database, efficients, table_upd, table3, table5, user_name, filename):
+def write2excel(database, filename):#, efficients, table_upd, table3, table5, user_name, filename):
     wb = Workbook()
 
     # writing tables 30x30
@@ -571,7 +569,7 @@ def write2excel(database, efficients, table_upd, table3, table5, user_name, file
         ws = wb.create_sheet(name)
 
         write_table30x30(ws, name, data)
-
+        """
         if name == 'Швидкостi потокiв':
             ws = wb.create_sheet('Критерії ефективності')
 
@@ -613,14 +611,15 @@ def write2excel(database, efficients, table_upd, table3, table5, user_name, file
     for row in table5:
         row = format_data_type(row)
         ws.append(row)
-
-    # change width of columns in order to see large data
-    for column in ['B', 'C', 'D', 'E', 'F', 'H', 'I', 'J']:
+    """
+    # change width of columns in order to properly see large data
+    ws = wb.get_sheet_by_name('Шляхи')
+    for column in ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']:
         ws.column_dimensions[column].width = 15
-
+    """
     # building chart
     ws = build_chart(ws)
-
+    """
     to_remove = wb.get_sheet_by_name('Sheet')
     wb.remove_sheet(to_remove)
 
@@ -647,24 +646,25 @@ def main():
     #
 
 
-    filename = 'Розрахунки-{}.xlsx'.format(user_name)
+    filename = 'Розрахунки-{}.xlsx'.format('Роман-Худобей')
 
     # main data storage
     mds = {}
 
     lens, paths = calculate_lens_and_paths(graph)
     mds['Найкоротшi вiдстанi'] = lens
+    mds['Шляхи'] = paths
 
-    time_movements = calculate_time_movements(lens, paths, speeds, nodes)
-    mds['Часи руху'] = time_movements
+    #time_movements = calculate_time_movements(lens, paths, speeds, nodes)
+    #mds['Часи руху'] = time_movements
 
-    transportation_costs = calculate_transportation_costs(lens, time_movements, nodes)
-    mds['Транспортнi витрати'] = transportation_costs
+    #transportation_costs = calculate_transportation_costs(lens, time_movements, nodes)
+    #mds['Транспортнi витрати'] = transportation_costs
 
     Dij, correspondences = calculate_correspondences(lens, flows, nodes)
-    mds['Кореспонденцiї'] = correspondences
     mds['Функція тяжіння між вузлами'] = Dij
-
+    mds['Кореспонденцiї'] = correspondences
+    """
     transport_streams_speed, transport_intensity = calculate_streams_speed(graph, stripes_quantity, stripe_bandwidth)
     mds['Швидкостi потокiв'] = transport_streams_speed
     mds['Iнтенсивностi потокiв'] = transport_intensity
@@ -716,10 +716,10 @@ def main():
     table5 = build_table5(coefs_kt, maintain_expenses, maintain_expenses_upd, transport_expenses, transport_expenses_upd, capital_expense_upd, base_total_expenses, propose_total_expenses)
 
     table_upd = build_table_upd(roads_upd, lens, stripes_quantity_upd, transport_streams_speed_upd, transport_intensity_upd, coefs_overload_upd)
+    """
+    write2excel(mds, filename)#, efficients, table_upd, table3, table5, user_name, filename)
 
-    write2excel(mds, efficients, table_upd, table3, table5, user_name, filename)
-
-    write_log('Висновки:\n\nЧас на мережі після реконструкцiї: {}. Різниця: {}\n{}\n\n'.format(time_efficient_upd, (time_efficient - time_efficient_upd), '_'*50))
+    #write_log('Висновки:\n\nЧас на мережі після реконструкцiї: {}. Різниця: {}\n{}\n\n'.format(time_efficient_upd, (time_efficient - time_efficient_upd), '_'*50))
 
     if not os.path.exists('Results'):
         os.makedirs('Results')
@@ -736,33 +736,16 @@ def main():
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Usage: user_name')
-        sys.exit(1)
-
-    user_name = sys.argv[1]
-
-    print('Welcome, {}!'.format(user_name))
+    print('Welcome!')
     print('Thank you for using our service. Enjoy.')
 
-    # variants of graphs by user_name
-    variants = {
-        'Роман-Худобей': config.GRAPH,
-        'Віталій-Стахів': config.STAHIV_GRAPH,
-        'Уляна-Жигальська': config.JUGALSKA_GRAPH,
-        'Соломія-Скоробагата': config.SKOROBAGATA_GRAPH
-    }
-
-    graph = variants[user_name]
+    graph = config.NEW_GRAPH
 
     n = config.N
     nodes = config.NODES
-    speeds = config.SPEEDS
     flows = config.FLOWS
-    stripes_quantity = config.STRIPES_QUANTITY
-    stripe_bandwidth = config.STRIPE_BANDWIDTH
     log = ''
-    log_filename = '{}-log.txt'.format(user_name)
+    log_filename = '{}-log.txt'.format('Роман-Худобей')
     restrict = [('1', '2'), ('2', '3'), ('3', '4')]     # format: (i, j); in order to restrict writing to log file
 
     if graph:
