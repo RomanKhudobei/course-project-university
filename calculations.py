@@ -42,8 +42,9 @@ def calculate_lens_and_paths(graph):
             paths[i][j] = path
     return lens, paths
 
-def calculate_Dij(lens, flows, nodes):
+def calculate_Dij(lens, flows, nodes, correction_coefs=None):
     Dij = {}
+
     for i in nodes:
         Dij[i] = {}
         for j in nodes:
@@ -54,8 +55,13 @@ def calculate_Dij(lens, flows, nodes):
             else:
                 Cij = lens[i][j]**-1
 
-            result = round(HPj * Cij, 2)
+            if correction_coefs:
+                result = round(HPj * Cij * correction_coefs[j], 2)
+            else:
+                result = round(HPj * Cij, 2)
+
             Dij[i][j] = result
+
     return Dij
 
 def calculate_matrix_column(j, matrix):
@@ -70,9 +76,9 @@ def calculate_matrix_row(i, matrix):
         result = result + matrix[i][j]
     return result
 
-def calculate_correspondences(lens, flows, nodes):
-    Dij = calculate_Dij(lens, flows, nodes)
+def calculate_correspondences(lens, flows, nodes, Dij):
     correspondences = {}
+
     for i in nodes:
         correspondences[i] = {}
         for j in nodes:
@@ -82,7 +88,26 @@ def calculate_correspondences(lens, flows, nodes):
 
             result = HOi * (top / bottom)
             correspondences[i][j] = round(result, 2)
-    return Dij, correspondences
+
+    return correspondences
+
+def calculate_delta_j_and_correction_coefs(flows, correspondences):
+    delta_j = {}
+    correction_coefs = {}
+
+    for j in nodes:
+        # calculated by me
+        calc_HPj = calculate_matrix_column(j, correspondences)
+        # input flow absorbtion
+        start_HPj = flows[j]['absorbtion']
+        
+        result = ((calc_HPj - start_HPj) / start_HPj) * 100
+        delta_j[j] = round(result, 2)
+
+        k = start_HPj / calc_HPj
+        correction_coefs[j] = k
+
+    return delta_j, correction_coefs
 
 def test_calculations(correspondences, flows):
     rows = []
@@ -141,24 +166,69 @@ def write_table10x10(ws, name, data):
         cell = ws.cell(row=row+2, column=1, value=row)
         cell.border = border
         cell.font = font
+
     # writing data into sheet
     for i in nodes:
         for j in nodes:
             row = int(i) + 2    # to compensate header
             column = int(j) + 1     # to compensate row indexes
             value = data[i].get(j, '')
+
             if type(value) == list:
                 value = '>'.join(value) or '-'
+
             cell = ws.cell(row=row, column=column, value=value)
             cell.border = border
+
+def write_table1x10(ws, name, data):
+    # writing name of table
+    ws.cell(row=1, column=1, value=name)
+
+    # set up styles to border
+    font = Font(bold=True, italic=True)
+
+    border = Border(
+        left=Side(border_style='thin', color='FF000000'),
+        right=Side(border_style='thin', color='FF000000'),
+        top=Side(border_style='thin', color='FF000000'),
+        bottom=Side(border_style='thin',color='FF000000')
+    )
+
+    # writing column names and row indexes
+    for column in nodes:
+        column = int(column)
+        
+        # column name
+        # +1 in order to have place for row indexes
+        cell = ws.cell(row=2, column=column+1, value=column)
+        cell.border = border
+        cell.font = font
+
+        # row index
+        # +2 in order to save space for title and column names
+        if int(column) < 2:
+            row = column
+            cell = ws.cell(row=row+2, column=1, value=row)
+            cell.border = border
+            cell.font = font
+
+    # writing data into prepared sheet
+    for j in nodes:
+        value = data[j]
+        cell = ws.cell(row=3, column=int(j)+1, value=round(value, 2))
+        cell.border = border
 
 def write2excel(database, filename):
     wb = Workbook()
 
     # writing tables 10x10
-    for name, data in database.items():
+    for name, data in database['10x10'].items():
         ws = wb.create_sheet(name)
         write_table10x10(ws, name, data)
+
+    for name, data in database['1x10'].items():
+        ws = wb.create_sheet(name)
+        write_table1x10(ws, name, data)
 
     # change width of columns in order to properly see large data
     ws = wb.get_sheet_by_name('Шляхи')
@@ -177,14 +247,27 @@ def main():
 
     # main data storage
     mds = {}
+    mds['10x10'] = {}
+    mds['1x10'] = {}
 
     lens, paths = calculate_lens_and_paths(graph)
-    mds['Найкоротшi вiдстанi'] = lens
-    mds['Шляхи'] = paths
+    mds['10x10']['Найкоротшi вiдстанi'] = lens
+    mds['10x10']['Шляхи'] = paths
 
-    Dij, correspondences = calculate_correspondences(lens, flows, nodes)
-    mds['Функція тяжіння між вузлами'] = Dij
-    mds['Кореспонденцiї'] = correspondences
+    Dij = calculate_Dij(lens, flows, nodes)
+    correspondences = calculate_correspondences(lens, flows, nodes, Dij)
+    mds['10x10']['Функція тяжіння між вузлами'] = Dij
+    mds['10x10']['Кореспонденцiї'] = correspondences
+
+    #test_correspondences_calculations(flows, correspondences)
+    delta_j, correction_coefs = calculate_delta_j_and_correction_coefs(flows, correspondences)
+    mds['1x10']['Δj'] = delta_j
+    mds['1x10']['Поправочні коефіцієнти'] = correction_coefs
+
+    corrected_Dij = calculate_Dij(lens, flows, nodes, correction_coefs)
+    corrected_correspondences = calculate_correspondences(lens, flows, nodes, corrected_Dij)
+    mds['10x10']['Функц.тяж.між.вузл(скорегов)'] = corrected_Dij
+    mds['10x10']['Кореспонденцiї (скорегована)'] = corrected_correspondences
 
     write2excel(mds, filename)
 
@@ -201,6 +284,24 @@ def main():
     #sumbit_rows_and_columns(correspondences)
     #test_calculations(correspondences, flows)
 
+def test_start_flows_equals(flows):
+    creation = 0
+    absorbtion = 0
+
+    for n in nodes:
+        creation += flows[n]['creation']
+        absorbtion += flows[n]['absorbtion']
+
+    return creation == absorbtion
+
+def test_correspondences_calculations(flows, correspondences):
+    for i in nodes:
+        HOi = flows[i]['creation']
+        for j in nodes:
+            HPj = flows[j]['absorbtion']
+            print('HOi: {} = {}'.format(HOi, calculate_matrix_row(i, correspondences)))
+            print('HPj: {} = {}'.format(HPj, calculate_matrix_column(j, correspondences)))
+
 
 if __name__ == '__main__':
     print('Welcome!')
@@ -211,6 +312,8 @@ if __name__ == '__main__':
     n = config.N
     nodes = config.NODES
     flows = config.FLOWS
+
+    assert test_start_flows_equals(flows) == True
 
     main()
 
