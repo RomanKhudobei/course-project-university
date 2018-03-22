@@ -91,9 +91,10 @@ def calculate_correspondences(lens, flows, nodes, Dij):
 
     return correspondences
 
-def calculate_delta_j_and_correction_coefs(flows, correspondences):
+def calculate_delta_j_and_correction_coefs(flows, correspondences, calc_correction_coefs=True):
     delta_j = {}
-    correction_coefs = {}
+    if calc_correction_coefs:
+        correction_coefs = {}
 
     for j in nodes:
         # calculated by me
@@ -104,10 +105,13 @@ def calculate_delta_j_and_correction_coefs(flows, correspondences):
         result = ((calc_HPj - start_HPj) / start_HPj) * 100
         delta_j[j] = round(result, 2)
 
-        k = start_HPj / calc_HPj
-        correction_coefs[j] = k
+        if calc_correction_coefs:
+            k = start_HPj / calc_HPj
+            correction_coefs[j] = k
 
-    return delta_j, correction_coefs
+    if calc_correction_coefs:
+        return delta_j, correction_coefs
+    return delta_j
 
 def test_calculations(correspondences, flows):
     rows = []
@@ -260,14 +264,17 @@ def main():
     mds['10x10']['Кореспонденцiї'] = correspondences
 
     #test_correspondences_calculations(flows, correspondences)
-    delta_j, correction_coefs = calculate_delta_j_and_correction_coefs(flows, correspondences)
-    mds['1x10']['Δj'] = delta_j
+    before_delta_j, correction_coefs = calculate_delta_j_and_correction_coefs(flows, correspondences)
+    mds['1x10']['Δj before'] = before_delta_j      # before correction*
     mds['1x10']['Поправочні коефіцієнти'] = correction_coefs
 
     corrected_Dij = calculate_Dij(lens, flows, nodes, correction_coefs)
     corrected_correspondences = calculate_correspondences(lens, flows, nodes, corrected_Dij)
     mds['10x10']['Функц.тяж.між.вузл(скорегов)'] = corrected_Dij
     mds['10x10']['Кореспонденцiї (скорегована)'] = corrected_correspondences
+
+    after_delta_j = calculate_delta_j_and_correction_coefs(flows, corrected_correspondences, calc_correction_coefs=False)
+    mds['1x10']['Δj after'] = after_delta_j
 
     write2excel(mds, filename)
 
