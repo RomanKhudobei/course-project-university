@@ -234,6 +234,11 @@ def write2excel(database, filename):
         ws = wb.create_sheet(name)
         write_table1x10(ws, name, data)
 
+    for name, data in database['single'].items():
+        ws = wb.create_sheet(name)
+        ws.cell(row=1, column=1, value=name)
+        ws.cell(row=2, column=1, value=data)
+
     # change width of columns in order to properly see large data
     ws = wb.get_sheet_by_name('Шляхи')
     for column in ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']:
@@ -244,6 +249,25 @@ def write2excel(database, filename):
 
     wb.save(filename)
 
+def calculate_transport_work(correspondences, lens):
+    transport_work = {}
+
+    for i in nodes:
+        transport_work[i] = {}
+        for j in nodes:
+            transport_work[i][j] = round(correspondences[i][j] * lens[i][j], 2)
+
+    return transport_work
+
+def calculate_min_transport_work(transport_work):
+    min_transport_work = 0
+
+    for i in nodes:
+        for j in nodes:
+            min_transport_work += transport_work[i][j]
+
+    return min_transport_work
+
 
 def main():
 
@@ -253,6 +277,7 @@ def main():
     mds = {}
     mds['10x10'] = {}
     mds['1x10'] = {}
+    mds['single'] = {}
 
     lens, paths = calculate_lens_and_paths(graph)
     mds['10x10']['Найкоротшi вiдстанi'] = lens
@@ -275,6 +300,11 @@ def main():
 
     after_delta_j = calculate_delta_j_and_correction_coefs(flows, corrected_correspondences, calc_correction_coefs=False)
     mds['1x10']['Δj after'] = after_delta_j
+
+    transport_work = calculate_transport_work(corrected_correspondences, lens)
+    min_transport_work = calculate_min_transport_work(transport_work)
+    mds['10x10']['Транспортна робота'] = transport_work
+    mds['single']['Мін. транспортна робота'] = min_transport_work
 
     write2excel(mds, filename)
 
