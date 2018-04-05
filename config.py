@@ -1,7 +1,7 @@
 
 # next semester, new course project
 
-NEW_GRAPH = {
+MY_GRAPH = {
     '1': {
         '2': 1.1,
         '6': 1.5,
@@ -62,9 +62,51 @@ NEW_GRAPH = {
     }
 }
 
-N = 10
 
-NODES = ('1' , '2' , '3' , '4' , '5' , '6' , '7' , '8' , '9' , '10')
+STAHIV_GRAPH = {
+    '1': {
+        '2': 1.5,
+        '10': 1.3
+    },
+    '2': {
+        '1': 1.5,
+        '3': 2.4,
+        '9': 1.1
+    },
+    '3': {
+        '2': 2.4,
+        '4': 1.6
+    },
+    '4': {
+        '3': 1.6,
+        '5': 2.6
+    },
+    '5': {
+        '4': 2.6
+    },
+    '6': {
+        '7': 2.4
+    },
+    '7': {
+        '6': 2.4,
+        '8': 1.8
+    },
+    '8': {
+        '7': 1.8,
+        '9': 1.3
+    },
+    '9': {
+        '2': 1.1,
+        '8': 1.3,
+        '10': 1.9
+    },
+    '10': {
+        '1': 1.3,
+        '9': 1.9
+    }
+}
+
+NODES = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
 
 STRIPE_BANDWIDTH = 750
 
@@ -220,7 +262,7 @@ SPEEDS = {
 }
 
 
-FLOWS = {
+MY_FLOWS = {
     '1': {
         'absorbtion': 1800, 
         'creation': 2300
@@ -260,6 +302,50 @@ FLOWS = {
     '9': {
         'absorbtion': 1400, 
         'creation': 1800
+    }
+}
+
+
+STAHIV_FLOWS = {
+    '1': {
+        'absorbtion': 900, 
+        'creation': 1400
+    },
+    '10': {
+        'absorbtion': 1600, 
+        'creation': 2600
+    },
+    '2': {
+        'absorbtion': 1900, 
+        'creation': 1200
+    },
+    '3': {
+        'absorbtion': 2700, 
+        'creation': 900
+    },
+    '4': {
+        'absorbtion': 1600, 
+        'creation': 1300
+    },
+    '5': {
+        'absorbtion': 700, 
+        'creation': 1900
+    },
+    '6': {
+        'absorbtion': 600, 
+        'creation': 2100
+    },
+    '7': {
+        'absorbtion': 2700, 
+        'creation': 800
+    },
+    '8': {
+        'absorbtion': 600, 
+        'creation': 1500
+    },
+    '9': {
+        'absorbtion': 1300, 
+        'creation': 900
     }
 }
 

@@ -271,7 +271,7 @@ def calculate_min_transport_work(transport_work):
 
 def main():
 
-    filename = 'Розрахунки-{}.xlsx'.format('Роман-Худобей')
+    filename = 'Розрахунки-{}.xlsx'.format(username)
 
     # main data storage
     mds = {}
@@ -344,11 +344,26 @@ if __name__ == '__main__':
     print('Welcome!')
     print('Thank you for using our service. Enjoy.')
 
-    graph = config.NEW_GRAPH
+    if len(sys.argv) != 2:
+        print(f'usage: {__file__} username\nExample: calculations.py Роман-Худобей')
+        sys.exit(0)
 
-    n = config.N
+    username = sys.argv[1]
+
+    graphs = {'Роман-Худобей': config.MY_GRAPH,
+              'Віталій-Стахів': config.STAHIV_GRAPH}
+
+    flows = {'Роман-Худобей': config.MY_FLOWS,
+             'Віталій-Стахів': config.STAHIV_FLOWS}
+
+    graph = graphs.get(username)
+    flows = flows.get(username)     # overwriting in case we don't need previous variable anymore
+
+    if graph is None or flows is None:
+        print("There's no data to starts with.\nCheck if you type username right or you forgot to register a user is config file.")
+        sys.exit(0)
+
     nodes = config.NODES
-    flows = config.FLOWS
 
     assert test_start_flows_equals(flows) == True
 
