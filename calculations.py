@@ -140,11 +140,7 @@ def sumbit_rows_and_columns(correspondences):
     print('sumbit rows: {}'.format(row))
     print('sumbit columns: {}'.format(column))
 
-def write_table10x10(ws, name, data):
-    # writing name of table
-    ws.cell(row=1, column=1, value=name)
-
-    # set up styles to border
+def get_xls_styles():
     font = Font(bold=True, italic=True)
 
     border = Border(
@@ -153,6 +149,14 @@ def write_table10x10(ws, name, data):
         top=Side(border_style='thin', color='FF000000'),
         bottom=Side(border_style='thin',color='FF000000')
     )
+    return font, border
+
+def write_table10x10(ws, name, data):
+    # writing name of table
+    ws.cell(row=1, column=1, value=name)
+
+    # set up styles to border
+    font, border = get_xls_styles()
 
     # writing column names and row indexes
     for column in nodes:
@@ -189,14 +193,7 @@ def write_table1x10(ws, name, data):
     ws.cell(row=1, column=1, value=name)
 
     # set up styles to border
-    font = Font(bold=True, italic=True)
-
-    border = Border(
-        left=Side(border_style='thin', color='FF000000'),
-        right=Side(border_style='thin', color='FF000000'),
-        top=Side(border_style='thin', color='FF000000'),
-        bottom=Side(border_style='thin',color='FF000000')
-    )
+    font, border = get_xls_styles()
 
     # writing column names and row indexes
     for column in nodes:
@@ -222,6 +219,41 @@ def write_table1x10(ws, name, data):
         cell = ws.cell(row=3, column=int(j)+1, value=round(value, 2))
         cell.border = border
 
+def write_table12x12(ws, name, data):
+    # writing name of table
+    ws.cell(row=1, column=1, value=name)
+
+    # set up styles to border
+    font, border = get_xls_styles()
+
+    # writing column names and row indexes
+    for column in nodes_12:
+        column = int(column)
+        
+        # column name
+        # +1 in order to have place for row indexes
+        cell = ws.cell(row=2, column=column+1, value=column)
+        cell.border = border
+        cell.font = font
+
+        # row index
+        # +2 in order to save space for title and column names
+        row = column
+        cell = ws.cell(row=row+2, column=1, value=row)
+        cell.border = border
+        cell.font = font
+
+    # writing data into sheet
+    for i in nodes_12:
+        for j in nodes_12:
+            row = int(i) + 2    # to compensate header
+            column = int(j) + 1     # to compensate row indexes
+
+            value = data[i].get(j, '')
+
+            cell = ws.cell(row=row, column=column, value=value)
+            cell.border = border
+
 def write2excel(database, filename):
     wb = Workbook()
 
@@ -238,6 +270,10 @@ def write2excel(database, filename):
         ws = wb.create_sheet(name)
         ws.cell(row=1, column=1, value=name)
         ws.cell(row=2, column=1, value=data)
+
+    for name, data in database['12x12'].items():
+        ws = wb.create_sheet(name)
+        write_table12x12(ws, name, data)
 
     # change width of columns in order to properly see large data
     ws = wb.get_sheet_by_name('Шляхи')
@@ -268,6 +304,48 @@ def calculate_min_transport_work(transport_work):
 
     return min_transport_work
 
+def get_arcs(path):
+    arcs = []
+    for i in range(len(path)):
+        if i == len(path) - 1:
+            break
+        arc = (path[i], path[i + 1])
+        arcs.append(arc)
+    return arcs
+
+def calculate_passenger_flow(graph, paths, correspondences):
+    passenger_flows = {}
+
+    for i in graph:
+        passenger_flows[i] = {}
+        for j in graph[i]:
+
+            pas_flow = 0
+
+            for m in nodes:
+                for n in nodes:
+
+                    if (i, j) in get_arcs(paths[m][n]):
+                        pas_flow += correspondences[m][n]
+
+            passenger_flows[i][j] = pas_flow
+
+    return passenger_flows
+
+def check_straight_and_reverse(passenger_flows):
+    straight_flow = 0
+    reverse_flow = 0
+
+    for i in passenger_flows:
+        for j in passenger_flows[i]:
+
+            if int(i) < int(j):
+                straight_flow += passenger_flows[i][j]
+            else:
+                reverse_flow += passenger_flows[i][j]
+
+    return straight_flow, reverse_flow
+
 
 def main():
 
@@ -278,6 +356,7 @@ def main():
     mds['10x10'] = {}
     mds['1x10'] = {}
     mds['single'] = {}
+    mds['12x12'] = {}
 
     lens, paths = calculate_lens_and_paths(graph)
     mds['10x10']['Найкоротшi вiдстанi'] = lens
@@ -305,6 +384,11 @@ def main():
     min_transport_work = calculate_min_transport_work(transport_work)
     mds['10x10']['Транспортна робота'] = transport_work
     mds['single']['Мін. транспортна робота'] = min_transport_work
+
+    passenger_flows = calculate_passenger_flow(graph, paths, corrected_correspondences)
+    straight_flow, reverse_flow = check_straight_and_reverse(passenger_flows)
+    mds['12x12']['Пасажиропотік'] = passenger_flows
+    mds['single']['Сума пас. потоків'] = f'Прямий напрям: {straight_flow}; Зворотній напрям: {reverse_flow}'.replace('.', ',')
 
     write2excel(mds, filename)
 
@@ -345,7 +429,7 @@ if __name__ == '__main__':
     print('Thank you for using our service. Enjoy.')
 
     if len(sys.argv) != 2:
-        print(f'usage: {__file__} username\nExample: calculations.py Роман-Худобей')
+        print(f'usage: {__file__} username\nexample: calculations.py Роман-Худобей')
         sys.exit(0)
 
     username = sys.argv[1]
@@ -364,6 +448,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     nodes = config.NODES
+    nodes_12 = config.NODES_12
 
     assert test_start_flows_equals(flows) == True
 
