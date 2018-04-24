@@ -429,7 +429,7 @@ if __name__ == '__main__':
     print('Thank you for using our service. Enjoy.')
 
     if len(sys.argv) != 2:
-        print(f'usage: {__file__} username\nexample: calculations.py Роман-Худобей')
+        print(f'usage: {__file__} username\nexample: {__file__} Роман-Худобей')
         sys.exit(0)
 
     username = sys.argv[1]
@@ -444,7 +444,7 @@ if __name__ == '__main__':
     flows = flows.get(username)     # overwriting in case we don't need previous variable anymore
 
     if graph is None or flows is None:
-        print("There's no data to starts with.\nCheck if you type username right or you forgot to register a user is config file.")
+        print("There's no data to start with.\nCheck if you typed username right or you forgot to register a user in config file.")
         sys.exit(0)
 
     nodes = config.NODES
