@@ -346,6 +346,49 @@ def check_straight_and_reverse(passenger_flows):
 
     return straight_flow, reverse_flow
 
+def collect_values(d):
+    # or just use [value for values in [d.values() for d in passenger_flows.values()] for value in list(values)]
+    if type(d) != dict:
+        return None
+
+    values = []
+
+    for value in d.values():
+
+        if type(value) == dict:
+            values += collect_values(value)
+        else:
+            values.append(value)
+
+    return values
+
+def make_recommendations(passenger_flows):
+    all_values = collect_values(passenger_flows)
+    high = max(all_values)
+    low = min(all_values)
+
+    delta = (high - low) / 3
+
+    recommendations = {}
+
+    for i in passenger_flows:
+        recommendations[i] = {}
+        for j in passenger_flows[i]:
+
+            if low <= passenger_flows[i][j] <= low+delta:
+                recommendations[i][j] = 1
+
+            elif low+delta <= passenger_flows[i][j] <= high-delta:
+                recommendations[i][j] = 2
+
+            elif high-delta <= passenger_flows[i][j] <= high:
+                recommendations[i][j] = 3
+
+            else:
+                recommendations[i][j] = 0
+
+    return recommendations
+
 
 def main():
 
@@ -389,6 +432,9 @@ def main():
     straight_flow, reverse_flow = check_straight_and_reverse(passenger_flows)
     mds['12x12']['Пасажиропотік'] = passenger_flows
     mds['single']['Сума пас. потоків'] = f'Прямий напрям: {straight_flow}; Зворотній напрям: {reverse_flow}'.replace('.', ',')
+
+    recommendations = make_recommendations(passenger_flows)
+    mds['12x12']['Рекомендації к-сті маршрутів'] = recommendations
 
     write2excel(mds, filename)
 
