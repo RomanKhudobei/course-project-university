@@ -1,0 +1,6 @@
+*backup*
+*graph*
+*.xlsx
+archive
+to_take_from.py
+__pycache__
