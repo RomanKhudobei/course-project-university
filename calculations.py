@@ -346,6 +346,21 @@ def check_straight_and_reverse(passenger_flows):
 
     return straight_flow, reverse_flow
 
+def calculate_general_pas_flows(passenger_flows, lens):
+    general_pas_flows = {}
+
+    for i in passenger_flows:
+        general_pas_flows[i] = {}
+        for j in passenger_flows[i]:
+
+            if int(i) > int(j):
+                continue
+
+            result = (passenger_flows[i][j] + passenger_flows[j][i]) * lens[i][j]
+            general_pas_flows[i][j] = round(result, 2)
+
+    return general_pas_flows
+
 def collect_values(d):
     # or just use [value for values in [d.values() for d in passenger_flows.values()] for value in list(values)]
     if type(d) != dict:
@@ -432,6 +447,9 @@ def main():
     straight_flow, reverse_flow = check_straight_and_reverse(passenger_flows)
     mds['12x12']['Пасажиропотік'] = passenger_flows
     mds['single']['Сума пас. потоків'] = f'Прямий напрям: {straight_flow}; Зворотній напрям: {reverse_flow}'.replace('.', ',')
+
+    general_pas_flows = calculate_general_pas_flows(passenger_flows, graph)
+    mds['12x12']['Заг. пас. потік'] = general_pas_flows
 
     recommendations = make_recommendations(passenger_flows)
     mds['12x12']['Рекомендації к-сті маршрутів'] = recommendations
