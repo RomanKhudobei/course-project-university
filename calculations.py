@@ -328,7 +328,7 @@ def calculate_passenger_flow(graph, paths, correspondences):
                     if (i, j) in get_arcs(paths[m][n]):
                         pas_flow += correspondences[m][n]
 
-            passenger_flows[i][j] = pas_flow
+            passenger_flows[i][j] = round(pas_flow, 0)
 
     return passenger_flows
 
