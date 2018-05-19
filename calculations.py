@@ -433,7 +433,7 @@ def calculate_routes_lens(routes, lens):
 
     for name, route in routes.items():
         routes_lens[name] = len_route(route, lens)
-    pprint(routes_lens)
+
     return routes_lens
 
 
