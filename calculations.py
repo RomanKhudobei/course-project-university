@@ -87,7 +87,7 @@ def calculate_correspondences(lens, flows, nodes, Dij):
             bottom = calculate_matrix_row(i, Dij)
 
             result = HOi * (top / bottom)
-            correspondences[i][j] = round(result, 2)
+            correspondences[i][j] = round(result, 0)
 
     return correspondences
 
