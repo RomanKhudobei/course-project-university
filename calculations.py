@@ -31,10 +31,10 @@ def shortest_path(graph, start, end):
 def calculate_lens_and_paths(graph):
     lens = {}
     paths = {}
-    for i in nodes:
+    for i in nodes_12:
         lens[i] = {}
         paths[i] = {}
-        for j in nodes:
+        for j in nodes_12:
             lenght, path = shortest_path(graph, i, j)
             lens[i][j] = lenght
             if len(path) == 1:
@@ -251,6 +251,9 @@ def write_table12x12(ws, name, data):
 
             value = data[i].get(j, '')
 
+            if type(value) == list:
+                value = '>'.join(value) or '-'
+
             cell = ws.cell(row=row, column=column, value=value)
             cell.border = border
 
@@ -450,8 +453,8 @@ def main():
     mds['12x12'] = {}
 
     lens, paths = calculate_lens_and_paths(graph)
-    mds['10x10']['Найкоротшi вiдстанi'] = lens
-    mds['10x10']['Шляхи'] = paths
+    mds['12x12']['Найкоротшi вiдстанi'] = lens
+    mds['12x12']['Шляхи'] = paths
 
     Dij = calculate_Dij(lens, flows, nodes)
     correspondences = calculate_correspondences(lens, flows, nodes, Dij)
