@@ -419,6 +419,24 @@ def check_routes(routes):
 
     return connections
 
+def len_route(route, lens):
+    lenght = 0
+    arcs = get_arcs(route)
+
+    for i, j in arcs:
+        lenght = lenght + lens[i][j]
+
+    return lenght
+
+def calculate_routes_lens(routes, lens):
+    routes_lens = {}
+
+    for name, route in routes.items():
+        routes_lens[name] = len_route(route, lens)
+    pprint(routes_lens)
+    return routes_lens
+
+
 
 def main():
 
@@ -472,6 +490,10 @@ def main():
     if routes:
         connections = check_routes(routes)
         mds['12x12']["Матриця зв'язків"] = connections
+
+        routes_lens = calculate_routes_lens(routes, lens)
+        mds['single']['Довжини маршрутів'] = '\n'.join([f'{name}: {lenght};' for name, lenght in routes_lens.items()])
+
     else:
         print("Info: Routes doesn't setup. Please, set them up and run program again in order to carry out related calculations.")
 
