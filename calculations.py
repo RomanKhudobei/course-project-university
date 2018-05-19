@@ -403,6 +403,22 @@ def make_recommendations(passenger_flows):
 
     return recommendations
 
+def check_routes(routes):
+    connections = {}
+
+    for i in nodes_12:
+        connections[i] = {}
+        for j in nodes_12:
+
+            for name, route in routes.items():
+                if i != j and (i in route and j in route):
+                    connections[i][j] = '+'
+                    break
+                else:
+                    connections[i][j] = ''
+
+    return connections
+
 
 def main():
 
@@ -452,6 +468,12 @@ def main():
 
     recommendations = make_recommendations(passenger_flows)
     mds['12x12']['Рекомендації к-сті маршрутів'] = recommendations
+
+    if routes:
+        connections = check_routes(routes)
+        mds['12x12']["Матриця зв'язків"] = connections
+    else:
+        print("Info: Routes doesn't setup. Please, set them up and run program again in order to carry out related calculations.")
 
     write2excel(mds, filename)
 
@@ -503,8 +525,11 @@ if __name__ == '__main__':
     flows = {'Роман-Худобей': config.MY_FLOWS,
              'Віталій-Стахів': config.STAHIV_FLOWS}
 
+    routes = {'Роман-Худобей': config.MY_ROUTES}
+
     graph = graphs.get(username)
     flows = flows.get(username)     # overwriting in case we don't need previous variable anymore
+    routes = routes.get(username)
 
     if graph is None or flows is None:
         print("There's no data to start with.\nCheck if you typed username right or you forgot to register a user in config file.")
