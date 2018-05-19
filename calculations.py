@@ -560,7 +560,7 @@ if __name__ == '__main__':
     nodes = config.NODES
     nodes_12 = config.NODES_12
 
-    assert test_start_flows_equals(flows) == True
+    assert test_start_flows_equals(flows) == True, "Please, check flows entered. Creation not equal absorbtion"
 
     main()
 
