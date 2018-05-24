@@ -456,6 +456,13 @@ def calculate_tranship_correspondence(connections, correspondences):
 
     return tranship_correspondence
 
+def calculate_tranship_coef(correspondences, tranship_correspondence):
+    correspondences_sum = sum(collect_values(correspondences))
+
+    tranship_coef = (correspondences_sum + tranship_correspondence) / correspondences_sum
+
+    return tranship_coef
+
 
 def main():
 
@@ -512,6 +519,10 @@ def main():
 
         routes_lens = calculate_routes_lens(routes, lens)
         mds['single']['Довжини маршрутів'] = '\n'.join([f'{name}: {lenght};' for name, lenght in routes_lens.items()])
+
+        tranship_correspondence = calculate_tranship_correspondence(connections, corrected_correspondences)
+        tranship_coef = calculate_tranship_coef(corrected_correspondences, tranship_correspondence)
+        mds['single']['Коефіцієнт пересаджуваності'] = tranship_coef
 
     else:
         print("Info: Routes doesn't setup. Please, set them up and run program again in order to carry out related calculations.")
