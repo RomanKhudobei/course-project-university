@@ -439,6 +439,22 @@ def calculate_routes_lens(routes, lens):
 
     return routes_lens
 
+def calculate_tranship_correspondence(connections, correspondences):
+    tranship_correspondence = 0
+
+    for i in connections:
+        for j in connections[i]:
+
+            if not connections[i][j] and i != j:
+                # Here we face with a problem, that input data doesn't have creation and absorbtion for nodes 11 and 12
+                # That's why I'm put try/except here.
+                # We can assume those to 0, as one of the solutions. This mean, that those nodes will be just trasnit (just to ride through).
+                try:
+                    tranship_correspondence += correspondences[i][j]
+                except:
+                    pass
+
+    return tranship_correspondence
 
 
 def main():
