@@ -91,6 +91,7 @@ def calculate_correspondences(lens, flows, nodes, Dij):
 
     return correspondences
 
+# dela_j - difference between given and calculated flow in % (must be as low as possible; delta_j < 5%*)
 def calculate_delta_j_and_correction_coefs(flows, correspondences, calc_correction_coefs=True):
     delta_j = {}
     if calc_correction_coefs:
@@ -99,7 +100,7 @@ def calculate_delta_j_and_correction_coefs(flows, correspondences, calc_correcti
     for j in nodes:
         # calculated by me
         calc_HPj = calculate_matrix_column(j, correspondences)
-        # input flow absorbtion
+        # given absorbtion flow
         start_HPj = flows[j]['absorbtion']
         
         result = ((calc_HPj - start_HPj) / start_HPj) * 100
@@ -116,6 +117,8 @@ def calculate_delta_j_and_correction_coefs(flows, correspondences, calc_correcti
 def test_calculations(correspondences, flows):
     rows = []
     columns = []
+
+    # probably can have only one loop and pass `i` in both functions
     for i in nodes:
         row = calculate_matrix_row(i, correspondences)
         rows.append(row)
@@ -249,7 +252,7 @@ def write_table12x12(ws, name, data):
             row = int(i) + 2    # to compensate header
             column = int(j) + 1     # to compensate row indexes
 
-            value = data[i].get(j, '')
+            value = data[i].get(j, '') or ''
 
             if type(value) == list:
                 value = '>'.join(value) or '-'
@@ -280,7 +283,7 @@ def write2excel(database, filename):
 
     # change width of columns in order to properly see large data
     ws = wb.get_sheet_by_name('Шляхи')
-    for column in ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']:
+    for column in ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']:
         ws.column_dimensions[column].width = 15
 
     to_remove = wb.get_sheet_by_name('Sheet')
@@ -288,6 +291,8 @@ def write2excel(database, filename):
 
     wb.save(filename)
 
+
+# probably can have one function insted two below
 def calculate_transport_work(correspondences, lens):
     transport_work = {}
 
@@ -308,6 +313,17 @@ def calculate_min_transport_work(transport_work):
     return min_transport_work
 
 def get_arcs(path):
+    """
+    Argumets:
+        path (list of integers) - path from `i` to `j` described by nodes (dots)
+    
+    Returns:
+        arcs (list of 2-length tuples) - path from `i` to `j` described by arcs (lines)
+
+    Example:
+        path = [1, 2, 3, 4]
+        arcs = [(1, 2), (2, 3), (3, 4)]
+    """
     arcs = []
     for i in range(len(path)):
         if i == len(path) - 1:
@@ -316,12 +332,29 @@ def get_arcs(path):
         arcs.append(arc)
     return arcs
 
+# Notes
+# correspondences has 10 nodes, because it is impossible to calculate 12,
+# because data given only for 10
 def calculate_passenger_flow(graph, paths, correspondences):
     passenger_flows = {}
 
     for i in graph:
         passenger_flows[i] = {}
         for j in graph[i]:
+            # In this place frist pair of loops iterates through nodes (12 included)
+            # second pair of loops iterates through 10
+            # check whether here is a bug or not ...
+
+            # AFTER CHECK:
+            # `bug` is too loud
+            # it's more like defect (describet before this function declaration)
+            # actually the pas_flow number incomplete because we don't have
+            # correspondences values for 10+ nodes but there are paths for that.
+
+            # maybe it don't even cause an mistake on calculations
+
+            #if int(i) > 10 or int(j) > 10:
+            #    continue
 
             pas_flow = 0
 
@@ -329,7 +362,10 @@ def calculate_passenger_flow(graph, paths, correspondences):
                 for n in nodes:
 
                     if (i, j) in get_arcs(paths[m][n]):
-                        pas_flow += correspondences[m][n]
+                        try:
+                            pas_flow += correspondences[m][n]
+                        except:
+                            continue
 
             passenger_flows[i][j] = round(pas_flow, 0)
 
@@ -358,7 +394,7 @@ def calculate_general_pas_flow(passenger_flows, lens):
             if int(i) > int(j):
                 continue
 
-            result = (passenger_flows[i][j] + passenger_flows[j][i]) * lens[i][j]
+            result = ( passenger_flows[i][j] + passenger_flows[j][i] ) * lens[i][j]
             general_pas_flow = general_pas_flow + result
 
     return round(general_pas_flow, 1)
@@ -407,18 +443,16 @@ def make_recommendations(passenger_flows):
     return recommendations
 
 def check_routes(routes):
-    connections = {}
+    # init dict with all zeros in order to be able increment them further
+    connections = { i: {} for i in nodes_12 for j in nodes_12}
+    [ connections[i].update({j: 0}) for i in nodes_12 for j in nodes_12 ]
 
     for i in nodes_12:
-        connections[i] = {}
         for j in nodes_12:
 
             for name, route in routes.items():
                 if i != j and (i in route and j in route):
-                    connections[i][j] = '+'
-                    break
-                else:
-                    connections[i][j] = ''
+                    connections[i][j] += 1
 
     return connections
 
@@ -429,7 +463,7 @@ def len_route(route, lens):
     for i, j in arcs:
         lenght = lenght + lens[i][j]
 
-    return lenght
+    return round(lenght, 2)
 
 def calculate_routes_lens(routes, lens):
     routes_lens = {}
@@ -463,10 +497,59 @@ def calculate_tranship_coef(correspondences, tranship_correspondence):
 
     return tranship_coef
 
+def find_route_max_pas_flow(route, passenger_flows):
+    route_max_pas_flow = 0
 
-def main():
+    for i, j in get_arcs(route):
+        if passenger_flows[i][j] > route_max_pas_flow:
+            route_max_pas_flow = passenger_flows[i][j]
 
-    filename = 'Розрахунки-{}.xlsx'.format(username)
+        if passenger_flows[j][i] > route_max_pas_flow:
+            route_max_pas_flow = passenger_flows[j][i]
+
+    return route_max_pas_flow
+
+def calc_top(route_path, passenger_flows, lens):
+    results = []
+
+    for i, j in get_arcs(route_path):
+        results.extend([passenger_flows[i][j] * lens[i][j], passenger_flows[j][i] * lens[j][i]])
+
+    return round(sum(results), 2)
+
+# maybe write route builder (evolutional algorithm)
+def calculate_routes_efficiency(lens, routes, routes_lens, passenger_flows):
+    routes_efficiency_coefs = {}
+
+    for route_num, route_path in routes.items():
+        top = calc_top(route_path, passenger_flows, lens)
+        bottom = 2 * find_route_max_pas_flow(route_path, passenger_flows) * routes_lens[route_num]
+
+        #print(f'#{route_num}: {top} / {bottom}')
+
+        routes_efficiency_coefs[route_num] = round(top / bottom, 2)
+
+    pprint(routes_efficiency_coefs)
+    average = str( sum(routes_efficiency_coefs.values()) / len(routes_efficiency_coefs) )
+    routes_efficiency_coefs['average'] = average
+    print('routes efficiency average: ', average)
+    return routes_efficiency_coefs
+
+def redistribute_correspondences(correspondences, connections):
+    redistributed_correspondences = {}
+
+    for i in correspondences:
+        redistributed_correspondences[i] = {}
+        for j in correspondences[i]:
+            try:
+                redistributed_correspondences[i][j] = correspondences[i][j] / connections[i][j]
+            except:
+                redistributed_correspondences[i][j] = 'div/zero'
+
+    return redistributed_correspondences
+
+
+def main(create_xls=True):
 
     # main data storage
     mds = {}
@@ -515,32 +598,46 @@ def main():
 
     if routes:
         connections = check_routes(routes)
-        mds['12x12']["Матриця зв'язків"] = connections
+        mds['12x12']['Матриця зв\'язків'] = connections
 
         routes_lens = calculate_routes_lens(routes, lens)
-        mds['single']['Довжини маршрутів'] = '\n'.join([f'{name}: {lenght};' for name, lenght in routes_lens.items()])
+        mds['single']['Довжини маршрутів'] = '\n'.join([f'{name}: {lenght}; ' for name, lenght in routes_lens.items()])
 
         tranship_correspondence = calculate_tranship_correspondence(connections, corrected_correspondences)
         tranship_coef = calculate_tranship_coef(corrected_correspondences, tranship_correspondence)
         mds['single']['Коефіцієнт пересаджуваності'] = tranship_coef
 
+        routes_efficiency_coefs = calculate_routes_efficiency(lens, routes, routes_lens, passenger_flows)
+        mds['single']['Коеф. ефективності маршрутів'] = '\n'.join([f'{name}: {coef}; ' for name, coef in routes_efficiency_coefs.items()])
+
+        redistributed_correspondences = redistribute_correspondences(corrected_correspondences, connections)
+        mds['10x10']['Перерозподілені Кореспонденцiї'] = redistributed_correspondences
+
+        redistributed_passenger_flows = calculate_passenger_flow(graph, paths, redistributed_correspondences)
+        mds['10x10']['Перерозподілені пас. потоки'] = redistributed_passenger_flows
+
     else:
         print("Info: Routes doesn't setup. Please, set them up and run program again in order to carry out related calculations.")
-
-    write2excel(mds, filename)
-
-    if not os.path.exists('Results'):
-        os.makedirs('Results')
-
-    source = os.path.realpath(filename)
-    destination = os.path.realpath('Results/{}'.format(filename))
-
-    shutil.move(source, destination)    # move result file in "Results" directory
 
     # test cases
 
     #sumbit_rows_and_columns(correspondences)
     #test_calculations(correspondences, flows)
+
+    if create_xls:
+        filename = 'Розрахунки-{}.xlsx'.format(username)
+
+        write2excel(mds, filename)
+
+        if not os.path.exists('Results'):
+            os.makedirs('Results')
+
+        source = os.path.realpath(filename)
+        destination = os.path.realpath('Results/{}'.format(filename))
+
+        shutil.move(source, destination)    # move result file in "Results" directory
+
+    return mds
 
 def test_start_flows_equals(flows):
     creation = 0
@@ -578,6 +675,15 @@ if __name__ == '__main__':
              'Віталій-Стахів': config.STAHIV_FLOWS}
 
     routes = {'Роман-Худобей': config.MY_ROUTES}
+
+    #################################################################################
+    #                               I M P O R T A N T                               #
+    #                                                                               #
+    # graph = {'1': ['6', '11', '2']}                                               #
+    # lens = {'1': {'6': 1.5, '11': 2, '2': 1.2}}                                   #
+    # shortest_paths = {'1': {'6': ['1', '6'], '11': ['1', '11'], '2': ['1', '2']}} #
+    #                                                                               #
+    #################################################################################
 
     graph = graphs.get(username)
     flows = flows.get(username)     # overwriting in case we don't need previous variable anymore

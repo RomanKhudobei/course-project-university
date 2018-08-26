@@ -62,11 +62,45 @@ MY_GRAPH = {
     }
 }
 
-MY_ROUTES = {
+# Good (You can access any node from any node)
+# Efficiency: 0.5825
+MY_ROUTES2 = {
     '1': ['4', '3', '2', '1', '6', '11', '10', '9', '8'],
     '2': ['3', '2', '1', '6', '11', '12', '7'],
     '3': ['1', '6', '2', '3', '4', '5', '12', '7', '8'],
     '4': ['5', '12', '11', '10', '9', '8', '7']
+}
+
+# Efficiency: 0.51
+MY_ROUTES = {
+    '1': ['1', '6', '11', '10', '9', '8'],
+    '2': ['6', '1', '2', '3', '4', '5'],
+    '3': ['1', '6', '11', '12', '7', '8'],
+    '4': ['8', '7', '12', '5', '4', '3'],
+    '5': ['7', '8', '9', '10', '11', '12']
+}
+
+"""
+    -- The recommendation how to build most effective route --
+    If we look closer to the calculation formula (3.18) we can see
+    next dependency:
+        The greater the denominator (top) prevails over the numerator (bottom) - 
+        the greater the result 
+    What is top value? Product (`*`) of passenger_flow[i][j] and lens[i][j]
+    The bottom value is similar.
+    So in order to achieve most efficiency we need to arcs be similar
+    in passenger_flow value through the route. Because big difference
+    between max pas_flow and average pas_flow (in route) makes result
+    smaller.
+"""
+# Efficiency: 0.666
+MY_ROUTES2 = {
+    '1': ['3', '2', '1', '11', '8'],
+    #
+    '2': ['6', '1', '2', '3', '4', '5'],
+    '3': ['1', '6', '11', '12', '7', '8'],
+    '4': ['8', '7', '12', '5', '4', '3'],
+    '5': ['7', '8', '9', '10', '11', '12']
 }
 
 
