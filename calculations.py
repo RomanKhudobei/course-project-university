@@ -11,9 +11,8 @@ from openpyxl.chart import LineChart, Reference
 
 import config
 
-# Python 3 baby
-# shortest_path procedure is from http://code.activestate.com/recipes/119466-dijkstras-algorithm-for-shortest-paths/
 
+# shortest_path procedure is from http://code.activestate.com/recipes/119466-dijkstras-algorithm-for-shortest-paths/
 # Chris Laffra - best one
 def shortest_path(graph, start, end):
     queue = [(0, start, [])]
@@ -48,7 +47,7 @@ def calculate_Dij(lens, flows, nodes, correction_coefs=None):
     for i in nodes:
         Dij[i] = {}
         for j in nodes:
-            HPj = flows[j]['absorbtion']
+            HPj = flows[j]['absorption']
 
             if i == j:
                 Cij = 0.01 + 0.01 * 2   # 2 - остання цифра заліковки
@@ -100,8 +99,8 @@ def calculate_delta_j_and_correction_coefs(flows, correspondences, calc_correcti
     for j in nodes:
         # calculated by me
         calc_HPj = calculate_matrix_column(j, correspondences)
-        # given absorbtion flow
-        start_HPj = flows[j]['absorbtion']
+        # given absorption flow
+        start_HPj = flows[j]['absorption']
         
         result = ((calc_HPj - start_HPj) / start_HPj) * 100
         delta_j[j] = round(result, 2)
@@ -129,7 +128,7 @@ def test_calculations(correspondences, flows):
     
     result = zip(rows, columns)
     for i, values in enumerate(result):
-        print('{}. creation: {}; absorbtion: {}'.format(i+1, values[0], values[1]))
+        print('{}. creation: {}; absorption: {}'.format(i+1, values[0], values[1]))
 
 def sumbit_rows_and_columns(correspondences):
     row = 0
@@ -480,7 +479,7 @@ def calculate_tranship_correspondence(connections, correspondences):
         for j in connections[i]:
 
             if not connections[i][j] and i != j:
-                # Here we face with a problem, that input data doesn't have creation and absorbtion for nodes 11 and 12
+                # Here we face with a problem, that input data doesn't have creation and absorption for nodes 11 and 12
                 # That's why I'm put try/except here.
                 # We can assume those to 0, as one of the solutions. This mean, that those nodes will be just trasnit (just to ride through).
                 try:
@@ -590,7 +589,7 @@ def main(create_xls=True):
     mds['12x12']['Пасажиропотік'] = passenger_flows
     mds['single']['Сума пас. потоків'] = f'Прямий напрям: {straight_flow}; Зворотній напрям: {reverse_flow}'.replace('.', ',')
 
-    general_pas_flow = calculate_general_pas_flow(passenger_flows, graph)
+    general_pas_flow = calculate_general_pas_flow(passenger_flows, lens)    # fix bug: lens instead graph (in new-project branch)
     mds['single']['Заг. пас. потік'] = f'Загальний пасажиропотік: {general_pas_flow}'.replace('.', ',')
 
     recommendations = make_recommendations(passenger_flows)
@@ -641,19 +640,19 @@ def main(create_xls=True):
 
 def test_start_flows_equals(flows):
     creation = 0
-    absorbtion = 0
+    absorption = 0
 
     for n in nodes:
         creation += flows[n]['creation']
-        absorbtion += flows[n]['absorbtion']
+        absorption += flows[n]['absorption']
 
-    return creation == absorbtion
+    return creation == absorption
 
 def test_correspondences_calculations(flows, correspondences):
     for i in nodes:
         HOi = flows[i]['creation']
         for j in nodes:
-            HPj = flows[j]['absorbtion']
+            HPj = flows[j]['absorption']
             print('HOi: {} = {}'.format(HOi, calculate_matrix_row(i, correspondences)))
             print('HPj: {} = {}'.format(HPj, calculate_matrix_column(j, correspondences)))
 
@@ -696,7 +695,7 @@ if __name__ == '__main__':
     nodes = config.NODES
     nodes_12 = config.NODES_12
 
-    assert test_start_flows_equals(flows) == True, "Please, check flows entered. Creation not equal absorbtion"
+    assert test_start_flows_equals(flows), "Please, check flows entered. Creation not equal absorption"
 
     main()
 
