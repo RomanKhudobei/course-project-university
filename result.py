@@ -185,8 +185,8 @@ class ExcelResultsWriter(object):
         ws.write_row('A2', ['Прямий напрям'] + [route_obj.passenger_flow[i][j] for i, j in route_obj.arcs])
         ws.write_row('A3', ['Зворотній напрям'] + [route_obj.passenger_flow[j][i] for i, j in route_obj.arcs])
 
-        chart = wb.add_chart({'type': 'column'})
-        # chart = wb.add_chart({'type': 'line'})
+        # chart = wb.add_chart({'type': 'column'})
+        chart = wb.add_chart({'type': 'line'})
         print()
         chart.add_series({
             'name': '=Sheet1!$A$2',

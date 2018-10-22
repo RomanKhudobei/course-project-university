@@ -1,4 +1,10 @@
 import random
+import decimal
+from decimal import Decimal as D
+
+
+CONTEXT = decimal.getcontext()
+CONTEXT.rounding = decimal.ROUND_HALF_UP
 
 
 class Route(object):
@@ -6,7 +12,7 @@ class Route(object):
     def __init__(self, path=[], graph=None):
         # TODO: write setters/getters like in graph
         self.path = path
-        self.__efficiency = 0
+        self.__efficiency = D('0')
         self.graph = graph
         self.passenger_flow = {}
 
@@ -25,8 +31,8 @@ class Route(object):
             raise AttributeError('Provide graph to calculate passenger flow of the route')
 
         for i, j in self.arcs:
-            pass_flow_straight = 0
-            pass_flow_reverse = 0
+            pass_flow_straight = D('0')
+            pass_flow_reverse = D('0')
 
             self.passenger_flow.setdefault(i, {})
             self.passenger_flow.setdefault(j, {})
@@ -46,6 +52,10 @@ class Route(object):
                     if m_index <= row_index and n_index >= column_index:
                         try:
                             pass_flow_straight += self.graph.results['redistributed_correspondences'].result[m][n]
+
+                        except TypeError:
+                            pass
+
                         except KeyError:
                             pass
 
@@ -58,6 +68,10 @@ class Route(object):
                     if m_index >= row_index and n_index <= column_index:
                         try:
                             pass_flow_reverse += self.graph.results['redistributed_correspondences'].result[m][n]
+
+                        except TypeError:
+                            pass
+
                         except KeyError:
                             pass
 
@@ -66,17 +80,17 @@ class Route(object):
 
                     # exchange values back again
                     row_index, column_index = column_index, row_index
-
+            
             self.passenger_flow[i].update({j: pass_flow_straight})
             self.passenger_flow[j].update({i: pass_flow_reverse})
 
     def calculate_route_efficiency(self):
-        top = 0
+        top = D('0')
         for i, j in self.arcs:
             top += self.passenger_flow[i][j] * self.graph.results['lens'].result[i][j]
             top += self.passenger_flow[j][i] * self.graph.results['lens'].result[j][i]
 
-        route_max_pas_flow = 0
+        route_max_pas_flow = D('0')
         for i, j in self.arcs:
             if self.passenger_flow[i][j] > route_max_pas_flow:
                 route_max_pas_flow = self.passenger_flow[i][j]
@@ -84,8 +98,8 @@ class Route(object):
             if self.passenger_flow[j][i] > route_max_pas_flow:
                 route_max_pas_flow = self.passenger_flow[j][i]
 
-        bottom = 2 * route_max_pas_flow * sum([self.graph.results['lens'].result[i][j] for i, j in self.arcs])
-
+        bottom = D('2') * route_max_pas_flow * sum([self.graph.results['lens'].result[i][j] for i, j in self.arcs])
+    
         route_efficiency = round(top / bottom, 2)
         self.__efficiency = route_efficiency
         print(f'{route_efficiency} = {top} / {bottom}')

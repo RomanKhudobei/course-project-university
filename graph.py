@@ -1,17 +1,19 @@
 import heapq
-from collections import OrderedDict
-from pprint import pprint
 import time
 import sys
-from decimal import Decimal as D
 import decimal
-
-CONTEXT = decimal.getcontext()
-CONTEXT.rounding = decimal.ROUND_HALF_UP    # properly usage round(<decimal.Decimal object at 01239ff>, 0)
+from copy import deepcopy
+from decimal import Decimal as D
+from collections import OrderedDict
+from pprint import pprint
 
 import config
 from result import Result
 from route_builder import RouteNetworkBuilder, Route
+
+
+CONTEXT = decimal.getcontext()
+CONTEXT.rounding = decimal.ROUND_HALF_UP    # properly usage round(<decimal.Decimal object at 01239ff>, 0)
 
 
 class Graph(object):
@@ -97,7 +99,7 @@ class Graph(object):
                 path = path + [v]
                 seen.add(v)
                 if v == end:
-                    return round(cost, 1), path
+                    return cost, path
                 for (next, c) in graph[v].items():
                     heapq.heappush(queue, (cost + c, next, path))
 
@@ -109,7 +111,7 @@ class Graph(object):
             paths[i] = {}
             for j in self.NODES_12:
                 lenght, path = self.__shortest_path(i, j)
-                lens[i][j] = lenght
+                lens[i][j] = round(D(lenght), 1)
                 if len(path) == 1:
                     path = []
                 paths[i][j] = path
@@ -124,22 +126,21 @@ class Graph(object):
                 HPj = flows[j]['absorption']
 
                 if i == j:
-                    Cij = 0.01 + 0.01 * config.LAST_CREDIT_DIGIT    # остання цифра заліковки
+                    Cij = D('0.01') + D('0.01') * config.LAST_CREDIT_DIGIT    # остання цифра заліковки
                 else:
-                    Cij = lens[i][j] ** -1
+                    Cij = lens[i][j] ** D('-1')
 
                 if correction_coefs:
                     result = HPj * Cij * correction_coefs[j]     # TODO: Rounding "feature": round(1.5) => 2; round(2.5) => 2; Use decimal.Decimal instead
                 else:
                     result = HPj * Cij
 
-                Dij[i][j] = round(result)
+                Dij[i][j] = round(result, 0)
 
         return Result('10x10', 'Функція тяжіння між вузлами', Dij)
 
     def __calculate_correspondences(self, flows, Dij):
         correspondences = {}
-        to_log = True if self.results.get('correction_coefs') else False
 
         for i in self.NODES:
             correspondences[i] = {}
@@ -149,10 +150,7 @@ class Graph(object):
                 bottom = self.__calculate_matrix_row(i, Dij)
 
                 result = HOi * top / bottom
-                correspondences[i][j] = round(result)
-
-                if to_log:
-                    print(f'{correspondences[i][j]} = {HOi} * {top} / {bottom}')
+                correspondences[i][j] = round(result, 0)
 
         return Result('10x10', 'Кореспонденції', correspondences)
 
@@ -168,16 +166,16 @@ class Graph(object):
             # given absorption flow
             given_HPj = flows[j]['absorption']
 
-            result = ((calc_HPj - given_HPj) / given_HPj) * 100
-            delta_j[j] = round(result, 2)
+            result = ((calc_HPj - given_HPj) / given_HPj) * D('100')
+            delta_j[j] = abs(round(result, 1))
 
             if calc_correction_coefs:
                 k = given_HPj / calc_HPj
                 correction_coefs[j] = round(k, 3)
 
         if calc_correction_coefs:
-            return Result('1x10', 'Δj before', delta_j), Result('1x10', 'Поправочні коефіцієнти', correction_coefs)
-        return Result('1x10', 'Δj before', delta_j)
+            return Result('1x10', 'Δj Після', delta_j), Result('1x10', 'Поправочні коефіцієнти', correction_coefs)
+        return Result('1x10', 'Δj До', delta_j)
 
     # probably can have one function insted two below
     def __calculate_transport_work(self, correspondences, lens):
@@ -186,12 +184,12 @@ class Graph(object):
         for i in self.NODES:
             transport_work[i] = {}
             for j in self.NODES:
-                transport_work[i][j] = round(correspondences[i][j] * lens[i][j], 2)
+                transport_work[i][j] = round(correspondences[i][j] * lens[i][j], 1)
 
         return Result('10x10', 'Транспортна робота', transport_work)
 
     def __calculate_min_transport_work(self, transport_work):
-        min_transport_work = 0
+        min_transport_work = D('0')
 
         for i in self.NODES:
             for j in self.NODES:
@@ -220,7 +218,7 @@ class Graph(object):
 
                 # maybe it don't even cause an mistake on calculations
 
-                pas_flow = 0
+                pas_flow = D('0')
 
                 for m in self.NODES:
                     for n in self.NODES:
@@ -236,8 +234,8 @@ class Graph(object):
         return Result('12x12', 'Пасажиропотік', passenger_flows)
 
     def __calculate_straight_and_reverse_passenger_flow(self, passenger_flows):
-        straight_flow = 0
-        reverse_flow = 0
+        straight_flow = D('0')
+        reverse_flow = D('0')
 
         for i in passenger_flows:
             for j in passenger_flows[i]:
@@ -251,7 +249,7 @@ class Graph(object):
                       f'Прямий напрям: {straight_flow}; Зворотній напрям: {reverse_flow}'.replace('.', ','))
 
     def __calculate_general_pas_flow(self, passenger_flows, lens):
-        general_pas_flow = 0
+        general_pas_flow = D('0')
 
         for i in passenger_flows:
             for j in passenger_flows[i]:
@@ -270,7 +268,7 @@ class Graph(object):
         high = max(all_values)
         low = min(all_values)
 
-        delta = (high - low) / 3
+        delta = (high - low) / D('3')
 
         recommendations = {}
 
@@ -279,16 +277,16 @@ class Graph(object):
             for j in passenger_flows[i]:
 
                 if low <= passenger_flows[i][j] <= low + delta:
-                    recommendations[i][j] = 1
+                    recommendations[i][j] = D('1')
 
                 elif low + delta <= passenger_flows[i][j] <= high - delta:
-                    recommendations[i][j] = 2
+                    recommendations[i][j] = D('2')
 
                 elif high - delta <= passenger_flows[i][j] <= high:
-                    recommendations[i][j] = 3
+                    recommendations[i][j] = D('3')
 
                 else:
-                    recommendations[i][j] = 0
+                    recommendations[i][j] = D('0')
 
         return Result('12x12', 'Рекомендації к-сті маршрутів', recommendations)
 
@@ -299,7 +297,7 @@ class Graph(object):
             redistributed_correspondences[i] = {}
             for j in correspondences[i]:
                 try:
-                    redistributed_correspondences[i][j] = round(correspondences[i][j] / connections[i][j])
+                    redistributed_correspondences[i][j] = round(correspondences[i][j] / connections[i][j], 0)
                 except ZeroDivisionError:
                     redistributed_correspondences[i][j] = 'div/zero'
                 except KeyError:
@@ -322,10 +320,10 @@ class Graph(object):
             # self.__calculate_routes_efficiency(routes)
             # print(numbers)
             self.__calculate_passenger_flows_on_routes(routes)
-            network_efficiency = sum(route.efficiency() for route in routes.values()) / len(routes)
+            network_efficiency = sum(route.calculate_route_efficiency() for route in routes.values()) / D(len(routes))
             print(network_efficiency)
 
-            if count_connections[0] <= 20 and network_efficiency > 0.6:    # TODO: get this value from command line
+            if count_connections[0] <= D('20') and network_efficiency > D('0.6'):    # TODO: get this value from command line
                 break
 
         return routes
@@ -374,14 +372,14 @@ class Graph(object):
 
     def __count_routes_per_line(self, routes):
         routes_per_line = {i: {} for i in self.NODES_12}
-        [routes_per_line[i].update({j: 0}) for i in self.NODES_12 for j in self.NODES_12 if i != j]
+        [routes_per_line[i].update({j: D('0')}) for i in self.NODES_12 for j in self.NODES_12 if i != j]
 
         for route_num, route_obj in routes.items():
             for i, j in route_obj.arcs:
-                routes_per_line[i][j] += 1
-                routes_per_line[j][i] += 1
+                routes_per_line[i][j] += D('1')
+                routes_per_line[j][i] += D('1')
 
-        return routes_per_line
+        return Result('12x12', 'routes_per_line', routes_per_line)
 
     def __find_possibilities_to_cut_routes(self, recommendations, routes_per_line):
         possibilities_to_cut_routes = {}
@@ -461,7 +459,7 @@ class Graph(object):
             route_obj.calculate_route_efficiency()
 
     def __calculate_transplantation_rate(self, connections, correspondences):
-        transplantation_correspondences = 0
+        transplantation_correspondences = D('0')
 
         for i in connections:
             for j in connections[i]:
@@ -477,7 +475,6 @@ class Graph(object):
 
         correspondences_sum = sum(self.__collect_values(correspondences))
         transplantation_rate = round((correspondences_sum + transplantation_correspondences) / correspondences_sum, 2)
-        print(f'{transplantation_rate} = ({correspondences_sum} + {transplantation_correspondences}) / {correspondences_sum}')
         return transplantation_rate
 
     def __find_shortest_path_by_routes(self, start, end, routes_per_line, graph=None):
@@ -494,12 +491,11 @@ class Graph(object):
         # Тому що можливо є довший маршрут, але з меншою кількістю пересадок
         # *в цьому випадку потрібно повернути тимчасово відкинуті маршрути, які не мали початкової точки
         # і перебирати пересічення вже по трьох маршрутах (2 пересадки)
-        from copy import deepcopy
         graph = graph or deepcopy(self.graph)
 
         _, shortest_path = self.__shortest_path(start, end, graph=graph)
         for i, j in self.__get_arcs(shortest_path):
-            if routes_per_line[i][j] == 0:
+            if routes_per_line[i][j] == D('0'):
                 del graph[i][j]
                 return self.__find_shortest_path_by_routes(start, end, routes_per_line, graph=graph)
 
@@ -509,12 +505,12 @@ class Graph(object):
         """ Calculates passenger flow (from other lines) that was not included """
         # init dict with all zeros in order to be able increment them further
         missed_flows = {}
-        [missed_flows.setdefault(i, {}).update({j: 0}) for i in self.NODES_12 for j in self.NODES_12 if i != j]
+        [missed_flows.setdefault(i, {}).update({j: D('0')}) for i in self.NODES_12 for j in self.NODES_12 if i != j]
 
         for i in self.NODES:
             for j in self.NODES:
 
-                if i == j or connections[i][j] != 0:
+                if i == j or connections[i][j] != D('0'):
                     continue
 
                 missed_flow = correspondences[i][j]
@@ -522,7 +518,7 @@ class Graph(object):
                 shortest_path = self.__find_shortest_path_by_routes(i, j, routes_per_line)
 
                 for m, n in self.__get_arcs(shortest_path):
-                    missed_flows[m][n] += round(missed_flow / routes_per_line[m][n])
+                    missed_flows[m][n] += round(missed_flow / routes_per_line[m][n], 0)
 
         return Result('12x12', 'Неврахований потік', missed_flows)
 
@@ -577,36 +573,46 @@ class Graph(object):
             count_connections = self.__count_connections(connections.result)
             print('count_connections (how many zeros)', count_connections)
 
+            routes_per_line = self.__count_routes_per_line(self.__routes)
+            # self.results.update({'routes_per_line': routes_per_line})
+
+            possibilities_to_cut_routes = self.__find_possibilities_to_cut_routes(self.results['recommendations'].result, routes_per_line.result)
+            # print(possibilities_to_cut_routes)
+
             redistributed_correspondences = self.__redistribute_correspondences(self.results['corrected_correspondences'].result, connections.result)
             self.results.update({'redistributed_correspondences': redistributed_correspondences})
 
             self.__calculate_passenger_flows_on_routes(self.__routes)
             # self.__calculate_routes_efficiency(self.__routes)
-            network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / len(self.__routes)
+            network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))
             print('Network efficiency', network_efficiency)
-
-            routes_per_line = self.__count_routes_per_line(self.__routes)
-
-            possibilities_to_cut_routes = self.__find_possibilities_to_cut_routes(self.results['recommendations'].result, routes_per_line)
-            # print(possibilities_to_cut_routes)
-
-            transplantation_rate = self.__calculate_transplantation_rate(connections.result, corrected_correspondences.result)
-            print('transplantation_rate', transplantation_rate)
-
-            missed_flows = self.__calculate_missed_flows(connections.result, corrected_correspondences.result, routes_per_line)
-            print('missed_flows', sum(self.__collect_values(missed_flows.result)))
-            self.results.update({'missed_flow': missed_flows})
-
-            # self.__calculate_passenger_flows_on_routes(self.__routes, missed_flows=missed_flows.result)
-            # # self.__calculate_routes_efficiency(self.__routes)
-            # network_efficiency = sum(route.calculate_route_efficiency() for route in self.__routes.values()) / len(self.__routes)
-            # print('Network efficiency after including', network_efficiency)
 
             for route_num, route_obj in self.__routes.items():
                 self.results.update({
                     f'route{route_num}': Result(
                         'route',
                         f'Маршрут №{route_num}',
+                        deepcopy(route_obj)
+                    )
+                })
+
+            transplantation_rate = self.__calculate_transplantation_rate(connections.result, corrected_correspondences.result)
+            print('transplantation_rate', transplantation_rate)
+
+            missed_flows = self.__calculate_missed_flows(connections.result, corrected_correspondences.result, routes_per_line.result)
+            print('missed_flows', sum(self.__collect_values(missed_flows.result)))
+            self.results.update({'missed_flow': missed_flows})
+
+            self.__calculate_passenger_flows_on_routes(self.__routes, missed_flows=missed_flows.result)
+            # self.__calculate_routes_efficiency(self.__routes)
+            network_efficiency = sum(route.calculate_route_efficiency() for route in self.__routes.values()) / len(self.__routes)
+            print('Network efficiency after including', network_efficiency)
+
+            for route_num, route_obj in self.__routes.items():
+                self.results.update({
+                    f'route{route_num}_missed_included': Result(
+                        'route',
+                        f'Маршрут №{route_num} (Із неврахованими)',
                         route_obj
                     )
                 })
