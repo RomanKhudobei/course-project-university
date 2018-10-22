@@ -2,12 +2,23 @@ import random
 import decimal
 from decimal import Decimal as D
 
+import config
+from utils import decimal_context_ROUND_UP_rule
+
 
 CONTEXT = decimal.getcontext()
-CONTEXT.rounding = decimal.ROUND_HALF_UP
+CONTEXT.rounding = config.DEFAULT_ROUNDING_RULE
 
 
 class Route(object):
+    PASSENGER_FLOW_TO_BUS_CAPACITY = {
+        (0, 300): (18, 30),
+        (301, 500): (30, 50),
+        (501, 1000): (50, 80),
+        (1001, 1800): (80, 100),
+        (1801, 2600): (100, 120),
+        (2601, 3800): (120, 160)
+    }
 
     def __init__(self, path=[], graph=None):
         # TODO: write setters/getters like in graph
@@ -15,6 +26,10 @@ class Route(object):
         self.__efficiency = D('0')
         self.graph = graph
         self.passenger_flow = {}
+        self.rational_bus_capacity = {
+            'by_interval': {},
+            'by_max_pass_flow': {}
+        }
 
     @property
     def arcs(self):
@@ -116,6 +131,49 @@ class Route(object):
 
         self.__efficiency = self.calculate_route_efficiency()
         return self.__efficiency
+
+    @decimal_context_ROUND_UP_rule
+    def rational_bus_capacity_by_interval(self, interval=8):
+        max_pass_flow = max(self.__collect_values(self.passenger_flow))
+
+        bus_capacity = round(max_pass_flow * interval / 60, 0)
+
+        self.rational_bus_capacity['by_interval'].update({interval: bus_capacity})
+        return bus_capacity
+
+    @decimal_context_ROUND_UP_rule
+    def rational_bus_capacity_by_passenger_flow(self):
+
+        max_route_pass_flow = max(self.__collect_values(self.passenger_flow))
+        bus_capacity = None
+
+        for (min_pass_flow, max_pass_flow), (min_capacity, max_capacity) in self.PASSENGER_FLOW_TO_BUS_CAPACITY.items():
+
+            if min_pass_flow <= max_route_pass_flow <= max_pass_flow:
+                bus_capacity = min_capacity + ((max_route_pass_flow - min_pass_flow) * (max_capacity - min_capacity) / (max_capacity - min_capacity))
+
+        if bus_capacity is None:
+            raise ValueError(f'Route passenger flow out of range ({max_route_pass_flow})')
+
+        self.rational_bus_capacity['by_max_pass_flow'].update({max_route_pass_flow: bus_capacity})
+        return bus_capacity
+
+    def __collect_values(self, d):
+        # or just use [value for values in [d.values() for d in passenger_flows.values()] for value in list(values)]
+        if type(d) != dict:
+            return None
+
+        values = []
+
+        for value in d.values():
+
+            if type(value) == dict:
+                values += self.__collect_values(value)
+            else:
+                values.append(value)
+
+        return values
+
 
     def append(self, value):
         self.path.append(value)

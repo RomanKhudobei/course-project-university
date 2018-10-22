@@ -1,4 +1,7 @@
+from decimal import ROUND_HALF_UP
 from decimal import Decimal as D
+
+DEFAULT_ROUNDING_RULE = ROUND_HALF_UP
 
 LAST_CREDIT_DIGIT = D('5')   # 2 - остання цифра заліковки
 

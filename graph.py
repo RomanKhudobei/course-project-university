@@ -13,7 +13,7 @@ from route_builder import RouteNetworkBuilder, Route
 
 
 CONTEXT = decimal.getcontext()
-CONTEXT.rounding = decimal.ROUND_HALF_UP    # properly usage round(<decimal.Decimal object at 01239ff>, 0)
+CONTEXT.rounding = config.DEFAULT_ROUNDING_RULE    # properly usage round(<decimal.Decimal object at 01239ff>, 0)
 
 
 class Graph(object):
@@ -607,6 +607,10 @@ class Graph(object):
             # self.__calculate_routes_efficiency(self.__routes)
             network_efficiency = sum(route.calculate_route_efficiency() for route in self.__routes.values()) / len(self.__routes)
             print('Network efficiency after including', network_efficiency)
+
+            # calculation of rational bus capacities on routes
+            # TODO: write logger with all formulas and values
+            # TODO: maybe write docx auto generation in further
 
             for route_num, route_obj in self.__routes.items():
                 self.results.update({
