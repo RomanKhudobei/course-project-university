@@ -1,6 +1,7 @@
 import config
 from graph import Graph
 from result import ExcelResultsWriter
+from logger import Logger
 
 
 if __name__ == '__main__':
@@ -9,3 +10,5 @@ if __name__ == '__main__':
 
     writer = ExcelResultsWriter(graph.results)
     writer.write2excel('test.xlsx')
+
+    Logger().save('MAIN')

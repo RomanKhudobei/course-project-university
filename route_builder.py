@@ -4,10 +4,13 @@ from decimal import Decimal as D
 
 import config
 from utils import decimal_context_ROUND_UP_rule
+from logger import Logger
 
 
 CONTEXT = decimal.getcontext()
 CONTEXT.rounding = config.DEFAULT_ROUNDING_RULE
+
+logger = Logger()
 
 
 class Route(object):
@@ -20,12 +23,14 @@ class Route(object):
         (2601, 3800): (120, 160)
     }
 
-    def __init__(self, path=[], graph=None):
+    def __init__(self, path=[], graph=None, bus=None):
         # TODO: write setters/getters like in graph
+        self.__id = str(random.randint(0, 1000))
         self.path = path
         self.__efficiency = D('0')
         self.graph = graph
         self.passenger_flow = {}
+        self.bus = bus
         self.rational_bus_capacity = {
             'by_interval': {},
             'by_max_pass_flow': {}
@@ -41,11 +46,18 @@ class Route(object):
             arcs.append(arc)
         return arcs
 
-    def calculate_passenger_flow(self, missed_flows=None):     # TODO Numpy has this functionality. Rewrite using it (2-3 rows of code)
+    def calculate_passenger_flow(self, missed_flows=None, force=False):     # TODO Numpy has this functionality. Rewrite using it (2-3 rows of code)
         if not self.graph:
             raise AttributeError('Provide graph to calculate passenger flow of the route')
 
+        if self.passenger_flow and missed_flows is None and not force:
+            return self.passenger_flow
+
+        logger.write_into('6.3', f"\nФормула (6.3) Для маршруту {self} {'(із неврахованим пасажиропотоком)' if missed_flows else ''}\n", create_if_not_exist=True)
+        log_count = 0
+
         for i, j in self.arcs:
+
             pass_flow_straight = D('0')
             pass_flow_reverse = D('0')
 
@@ -55,8 +67,11 @@ class Route(object):
             row_index = self.path.index(i)
             column_index = self.path.index(j)
 
-            for m in self.graph.results['redistributed_correspondences'].result:
-                for n in self.graph.results['redistributed_correspondences'].result[m]:
+            sbetween = []
+            rbetween = []
+
+            for m in self.graph.results['redistributed_correspondences'].data:
+                for n in self.graph.results['redistributed_correspondences'].data[m]:
 
                     try:
                         m_index = self.path.index(m)
@@ -66,7 +81,8 @@ class Route(object):
 
                     if m_index <= row_index and n_index >= column_index:
                         try:
-                            pass_flow_straight += self.graph.results['redistributed_correspondences'].result[m][n]
+                            pass_flow_straight += self.graph.results['redistributed_correspondences'].data[m][n]
+                            sbetween.append(str(self.graph.results['redistributed_correspondences'].data[m][n]))
 
                         except TypeError:
                             pass
@@ -76,13 +92,15 @@ class Route(object):
 
                         if missed_flows:
                             pass_flow_straight += missed_flows[m][n]
+                            sbetween.append(str(missed_flows[m][n]))
 
                     # calculate reverse
                     row_index, column_index = column_index, row_index
 
                     if m_index >= row_index and n_index <= column_index:
                         try:
-                            pass_flow_reverse += self.graph.results['redistributed_correspondences'].result[m][n]
+                            pass_flow_reverse += self.graph.results['redistributed_correspondences'].data[m][n]
+                            rbetween.append(str(self.graph.results['redistributed_correspondences'].data[m][n]))
 
                         except TypeError:
                             pass
@@ -92,18 +110,31 @@ class Route(object):
 
                         if missed_flows:
                             pass_flow_reverse += missed_flows[m][n]
+                            rbetween.append(str(missed_flows[m][n]))
 
                     # exchange values back again
                     row_index, column_index = column_index, row_index
             
+            if log_count < 2:
+                logger.write_into('6.3', f"N{i}-{j} = {' + '.join(sbetween)} = {pass_flow_straight}\n")
+                logger.write_into('6.3', f"N{j}-{i} = {' + '.join(rbetween)} = {pass_flow_reverse}\n")
+                log_count += 2
+                logger.write_into('6.3', '$route_efficiency_placeholder_' + self.__id + '$')
+
             self.passenger_flow[i].update({j: pass_flow_straight})
             self.passenger_flow[j].update({i: pass_flow_reverse})
 
-    def calculate_route_efficiency(self):
+    def efficiency(self, force=False):
+        if not self.passenger_flow:
+            raise ValueError('passenger_flow must be calculated first')
+
+        if self.__efficiency and not force:
+            return self.__efficiency
+
         top = D('0')
         for i, j in self.arcs:
-            top += self.passenger_flow[i][j] * self.graph.results['lens'].result[i][j]
-            top += self.passenger_flow[j][i] * self.graph.results['lens'].result[j][i]
+            top += self.passenger_flow[i][j] * self.graph.results['lens'].data[i][j]
+            top += self.passenger_flow[j][i] * self.graph.results['lens'].data[j][i]
 
         route_max_pas_flow = D('0')
         for i, j in self.arcs:
@@ -113,24 +144,55 @@ class Route(object):
             if self.passenger_flow[j][i] > route_max_pas_flow:
                 route_max_pas_flow = self.passenger_flow[j][i]
 
-        bottom = D('2') * route_max_pas_flow * sum([self.graph.results['lens'].result[i][j] for i, j in self.arcs])
+        bottom = D('2') * route_max_pas_flow * self.length()
     
         route_efficiency = round(top / bottom, 2)
         self.__efficiency = route_efficiency
-        print(f'{route_efficiency} = {top} / {bottom}')
+        efstr = f'kеф = {top} / {bottom} = {route_efficiency}'
+        # print(efstr)
+        logger.set_room('6.3', logger.get_room('6.3').replace(f'$route_efficiency_placeholder_{self.__id}$', efstr + '\n'))
         return route_efficiency
 
-    # Bad idea, because if path changed and efficiency was calculated to old path
-    # then for new path this will never be calculated
-    def efficiency(self):
-        if self.__efficiency:
-            return self.__efficiency
+    def slice_from_redistributed_correspondences(self, heading='Матриця міжрайонних кореспонденцій для маршруту'):
+        if not self.graph:
+            raise AttributeError('Provide graph to calculate passenger flow of the route')
 
-        if len(self) < 2:
-            return self.__efficiency
+        rows = [
+            [f'{heading} {self}'],    # title
+            [''] + [int(node) for node in str(self).split('-')]    # column indexes
+        ]
 
-        self.__efficiency = self.calculate_route_efficiency()
-        return self.__efficiency
+        for i in self.path:
+            row = [int(i)]      # converting into integer to avoid annoying excel mistake warning
+            for j in self.path:
+                try:
+                    row += [self.graph.results['redistributed_correspondences'].data[i][j]]
+                except KeyError:
+                    row += [D('0')]
+
+            rows.append(row)
+
+        return rows
+
+    def missed_flow_table_part(self):
+        if not self.graph:
+            raise AttributeError('Provide graph to calculate passenger flow of the route')
+        
+        rows = [['Перегони'] + [f'{i}-{j}' for i, j in self.arcs]]
+        straight = []
+        reverse = []
+
+        for i, j in self.arcs:
+            try:
+                straight.append(self.graph.results['missed_flows'].data[i][j])
+                reverse.append(self.graph.results['missed_flows'].data[j][i])
+            except KeyError:
+                pass
+
+        rows.append(['Прямий напрям'] + straight)
+        rows.append(['Зворотній напрям'] + reverse)
+        return rows
+
 
     @decimal_context_ROUND_UP_rule
     def rational_bus_capacity_by_interval(self, interval=8):
@@ -158,6 +220,13 @@ class Route(object):
         self.rational_bus_capacity['by_max_pass_flow'].update({max_route_pass_flow: bus_capacity})
         return bus_capacity
 
+    def __calculate_length(self):
+        # TODO: modificate to make possible log values into log file
+        return len(self)
+
+    def calculate_tech_and_economic_indicators(self):
+        pass
+
     def __collect_values(self, d):
         # or just use [value for values in [d.values() for d in passenger_flows.values()] for value in list(values)]
         if type(d) != dict:
@@ -174,7 +243,6 @@ class Route(object):
 
         return values
 
-
     def append(self, value):
         self.path.append(value)
 
@@ -182,11 +250,22 @@ class Route(object):
         if self.path:
             return self.path[-1]
 
+    def length(self):
+        if not self.graph:
+            raise AttributeError('Provide graph to calculate passenger flow of the route')
+
+        length = D('0')
+
+        for i, j in self.arcs:
+            length += self.graph.graph[i][j]
+
+        return length
+
     def __str__(self):
-        return f"{', '.join(self.path)} (Ефективність: {self.__efficiency})"
+        return f"{'-'.join(self.path)}"
 
     def __repr__(self):
-        return f"{', '.join(self.path)} (Ефективність: {self.__efficiency})"
+        return f"{'-'.join(self.path)}"
 
     def __len__(self):
         return len(self.path)
@@ -247,7 +326,8 @@ class RouteNetworkBuilder(object):
             # In second case it would check if len(route) < route_length and also returns it.
             if not self.__make_sense(potential_next_nodes, route):
                 # print(f"{' ' * RECURSION_DEPTH * 4}__make_sense in action!")
-                return self.build_route(RECURSION_DEPTH=RECURSION_DEPTH+1)  # reset-like
+                RECURSION_DEPTH += 1
+                return self.build_route(RECURSION_DEPTH=RECURSION_DEPTH)  # reset-like
 
             # try to choose another node if node already in route
             while True:

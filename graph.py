@@ -2,6 +2,7 @@ import heapq
 import time
 import sys
 import decimal
+import pandas as pd
 from copy import deepcopy
 from decimal import Decimal as D
 from collections import OrderedDict
@@ -10,10 +11,14 @@ from pprint import pprint
 import config
 from result import Result
 from route_builder import RouteNetworkBuilder, Route
+from logger import Logger   #, prepare_log
+from utils import decimal_context_ROUND_UP_rule
 
 
 CONTEXT = decimal.getcontext()
 CONTEXT.rounding = config.DEFAULT_ROUNDING_RULE    # properly usage round(<decimal.Decimal object at 01239ff>, 0)
+
+logger = Logger()
 
 
 class Graph(object):
@@ -103,6 +108,7 @@ class Graph(object):
                 for (next, c) in graph[v].items():
                     heapq.heappush(queue, (cost + c, next, path))
 
+    # @prepare_log(initial_line='Формула (1.1) Найкоротші відстані та шляхи\n')
     def __calculate_lens_and_paths(self):
         lens = {}
         paths = {}
@@ -110,36 +116,54 @@ class Graph(object):
             lens[i] = {}
             paths[i] = {}
             for j in self.NODES_12:
-                lenght, path = self.__shortest_path(i, j)
-                lens[i][j] = round(D(lenght), 1)
+                length, path = self.__shortest_path(i, j)
+                lens[i][j] = round(D(length), 1)
                 if len(path) == 1:
                     path = []
                 paths[i][j] = path
+
+                if (i, j) in config.RESTRICT_LOG:
+                    between = ''.join(" + " + str(self.graph[m][n]) if index != 0 else str(self.graph[m][n]) for index, (m, n) in enumerate(self.__get_arcs(path)))
+                    logger.write_into('MAIN', f"V{i}-{j} {'= ' + between + ' ' if between else ''}= {length}\n")
+
         return Result('12x12', 'Найкоротшi відстані', lens), Result('12x12', 'Шляхи', paths)
 
-    def __calculate_Dij(self, lens, flows, correction_coefs=None):
+    # @prepare_log(initial_line='Формула (2.3) Проміжна матриця і Трудність сполучення\n')
+    def __calculate_Dij_and_Cij(self, lens, flows, correction_coefs={str(i): D('1') for i in range(1, 11)}):
         Dij = {}
+        Cij = {}
+
+        C_if_i_equal_j = round(D('0.01') + D('0.01') * config.LAST_CREDIT_DIGIT, 2)   # остання цифра заліковки
+
+        if self.results.get('correction_coefs') is None:
+            logger.write_into('MAIN', f'* Формула (2.4) Спіш = 0.01 + 0.01 * {config.LAST_CREDIT_DIGIT} = {C_if_i_equal_j}\n')
 
         for i in self.NODES:
             Dij[i] = {}
+            Cij[i] = {}
             for j in self.NODES:
                 HPj = flows[j]['absorption']
 
                 if i == j:
-                    Cij = D('0.01') + D('0.01') * config.LAST_CREDIT_DIGIT    # остання цифра заліковки
+                    Cij_result = C_if_i_equal_j
+                    if (i, j) in config.RESTRICT_LOG and self.results.get('correction_coefs') is None:
+                        logger.write_into('MAIN', f'C{i}-{j} = {C_if_i_equal_j}\n')
                 else:
-                    Cij = lens[i][j] ** D('-1')
+                    Cij_result = round(lens[i][j] ** D('-1'), 3)
+                    if (i, j) in config.RESTRICT_LOG and self.results.get('correction_coefs') is None:
+                        logger.write_into('MAIN', f'C{i}-{j} = 1 / {self.results["lens"].data[i][j]} = {Cij_result}\n')
 
-                if correction_coefs:
-                    result = HPj * Cij * correction_coefs[j]     # TODO: Rounding "feature": round(1.5) => 2; round(2.5) => 2; Use decimal.Decimal instead
-                else:
-                    result = HPj * Cij
+                Dij_result = round(HPj * Cij_result * correction_coefs[j], 0)
+                if (i, j) in config.RESTRICT_LOG and self.results.get('correction_coefs') is None:
+                    logger.write_into('MAIN', f'D{i}-{j} = {HPj} * {Cij_result} * {correction_coefs[j]} = {Dij_result}\n')
 
-                Dij[i][j] = round(result, 0)
+                Dij[i][j] = Dij_result
+                Cij[i][j] = Cij_result
 
-        return Result('10x10', 'Функція тяжіння між вузлами', Dij)
+        return Result('10x10', 'Функція тяжіння між вузлами', Dij), Result('10x10', 'Трудність сполучення', Cij)
 
-    def __calculate_correspondences(self, flows, Dij):
+    # @prepare_log(initial_line='Формула (2.6) Кореспонденції\n')
+    def __calculate_correspondences(self, flows, Dij, log=True):
         correspondences = {}
 
         for i in self.NODES:
@@ -149,12 +173,27 @@ class Graph(object):
                 top = Dij[i][j]
                 bottom = self.__calculate_matrix_row(i, Dij)
 
-                result = HOi * top / bottom
-                correspondences[i][j] = round(result, 0)
+                result = round(HOi * top / bottom, 0)
+                correspondences[i][j] = result
+
+                if (i, j) in config.RESTRICT_LOG and log:
+                    logger.write_into('MAIN', f'H{i}-{j} = {HOi} * {top} / {bottom} = {result}\n')
 
         return Result('10x10', 'Кореспонденції', correspondences)
 
-    # dela_j - difference between given and calculated flow in % (must be as low as possible; delta_j < 5%*)
+    # @prepare_log(initial_line='Формула (2.8) (2.9)\n')
+    def __test_correspondences(self, correspondences):
+        creation = 0
+        absorption = 0
+
+        for n in self.NODES:
+            creation += self.__calculate_matrix_row(n, correspondences)
+            absorption += self.__calculate_matrix_column(n, correspondences)
+
+        logger.write_into('MAIN', f'E HOi = {creation}\n')
+        logger.write_into('MAIN', f'E HPj = {absorption}\n')
+
+    # delta_j - difference between given and calculated flow in % (must be as low as possible; delta_j < 5%*)
     def __calculate_delta_j_and_correction_coefs(self, flows, correspondences, calc_correction_coefs=True):
         delta_j = {}
         if calc_correction_coefs:
@@ -166,16 +205,21 @@ class Graph(object):
             # given absorption flow
             given_HPj = flows[j]['absorption']
 
-            result = ((calc_HPj - given_HPj) / given_HPj) * D('100')
-            delta_j[j] = abs(round(result, 1))
+            result = abs(round( ((calc_HPj - given_HPj) / given_HPj) * D('100'), 1))
+            delta_j[j] = result
+
+            if j == '1' and calc_correction_coefs:
+                logger.write_into('MAIN', f'Δ{j} = |{calc_HPj} - {given_HPj}| / {given_HPj} * 100 = {result}\n')
 
             if calc_correction_coefs:
-                k = given_HPj / calc_HPj
-                correction_coefs[j] = round(k, 3)
+                k = round(given_HPj / calc_HPj, 3)
+                correction_coefs[j] = k
+                if j == '1' and calc_correction_coefs:
+                    logger.write_into('MAIN', f'k{j} = {given_HPj} / {calc_HPj} = {k}\n')
 
         if calc_correction_coefs:
-            return Result('1x10', 'Δj Після', delta_j), Result('1x10', 'Поправочні коефіцієнти', correction_coefs)
-        return Result('1x10', 'Δj До', delta_j)
+            return Result('1x10', 'Δj До (Табл 2.6)', delta_j), Result('1x10', 'Поправочні коеф. (Табл 2.7)', correction_coefs)
+        return Result('1x10', 'Δj Після (Табл 2.10)', delta_j)
 
     # probably can have one function insted two below
     def __calculate_transport_work(self, correspondences, lens):
@@ -184,7 +228,11 @@ class Graph(object):
         for i in self.NODES:
             transport_work[i] = {}
             for j in self.NODES:
-                transport_work[i][j] = round(correspondences[i][j] * lens[i][j], 1)
+                result = round(correspondences[i][j] * lens[i][j], 1)
+                transport_work[i][j] = result
+
+                if (i, j) in config.RESTRICT_LOG:
+                    logger.write_into('MAIN', f'P{i}-{j} = {correspondences[i][j]} * {lens[i][j]} = {result}\n')
 
         return Result('10x10', 'Транспортна робота', transport_work)
 
@@ -195,6 +243,7 @@ class Graph(object):
             for j in self.NODES:
                 min_transport_work += transport_work[i][j]
 
+        logger.write_into('MAIN', f'Pmin = {min_transport_work}\n')
         return Result('single', 'Мін. транспортна робота', min_transport_work)
 
     # Notes
@@ -219,6 +268,7 @@ class Graph(object):
                 # maybe it don't even cause an mistake on calculations
 
                 pas_flow = D('0')
+                between = []
 
                 for m in self.NODES:
                     for n in self.NODES:
@@ -226,10 +276,16 @@ class Graph(object):
                         if (i, j) in self.__get_arcs(paths[m][n]):
                             try:
                                 pas_flow += correspondences[m][n]
+                                between.append(str(correspondences[m][n]))
+
                             except KeyError:
                                 continue
 
-                passenger_flows[i][j] = round(pas_flow, 0)
+                result = round(pas_flow, 0)
+                passenger_flows[i][j] = result
+
+                if between:
+                    logger.write_into('MAIN', f"Q{i}-{j} = {' + '.join(between)} = {result}\n")
 
         return Result('12x12', 'Пасажиропотік', passenger_flows)
 
@@ -248,8 +304,10 @@ class Graph(object):
         return Result('single', 'Сума пас. потоків',
                       f'Прямий напрям: {straight_flow}; Зворотній напрям: {reverse_flow}'.replace('.', ','))
 
-    def __calculate_general_pas_flow(self, passenger_flows, lens):
-        general_pas_flow = D('0')
+    def __calculate_transport_work_per_line(self, passenger_flows, lens):
+        transport_work_per_line = {'Перегони': [], 'Транспортна_робота': []}  # different structure for pandas
+
+        restrict_log = len(config.RESTRICT_LOG)
 
         for i in passenger_flows:
             for j in passenger_flows[i]:
@@ -257,18 +315,29 @@ class Graph(object):
                 if int(i) > int(j):
                     continue
 
-                result = (passenger_flows[i][j] + passenger_flows[j][i]) * lens[i][j]
-                general_pas_flow = general_pas_flow + result
+                result = round((passenger_flows[i][j] + passenger_flows[j][i]) * lens[i][j], 1)
+                transport_work_per_line['Перегони'].append(f'{i}-{j}')
+                transport_work_per_line['Транспортна_робота'].append(str(result))
 
-        return Result('single', 'Загальний пас. потоків',
-                      f'Загальний пасажиропотік: {round(general_pas_flow, 1)}'.replace('.', ','))
+                if restrict_log != 0:
+                    logger.write_into('MAIN', f'P{i}-{j} = ({passenger_flows[i][j]} + {passenger_flows[j][i]}) * {lens[i][j]} = {result}\n')
+                    restrict_log -= 1
 
+        logger.write_into('MAIN', f"\nФормула (4.3) Сума транспортних робіт\nPзаг = {' + '.join(transport_work_per_line['Транспортна_робота'])} = {sum(float(value) for value in transport_work_per_line['Транспортна_робота'])}\n")
+        return Result('pandas', 'Таблиця 4.1', transport_work_per_line)
+
+    @decimal_context_ROUND_UP_rule
     def __make_recommendations(self, passenger_flows):
         all_values = self.__collect_values(passenger_flows)
         high = max(all_values)
         low = min(all_values)
 
-        delta = (high - low) / D('3')
+        delta = round((high - low) / D('3'), 0)
+
+        logger.write_into('MAIN', f'Δ = ({high} - {low}) / 3 = {delta}\n')
+        logger.write_into('MAIN', f'Від {low}...{low + delta} - 1 маршрут\n')
+        logger.write_into('MAIN', f'Від {low + delta}...{high - delta} - 2 маршрути\n')
+        logger.write_into('MAIN', f'Від {high - delta}...{high} - 3 маршрути\n')
 
         recommendations = {}
 
@@ -297,36 +366,46 @@ class Graph(object):
             redistributed_correspondences[i] = {}
             for j in correspondences[i]:
                 try:
-                    redistributed_correspondences[i][j] = round(correspondences[i][j] / connections[i][j], 0)
+                    result = round(correspondences[i][j] / connections[i][j], 0)
+                    redistributed_correspondences[i][j] = result
+
+                    if (i, j) in config.RESTRICT_LOG:
+                        logger.write_into('6.2', f'H*{i}-{j} = {correspondences[i][j]} / {connections[i][j]} = {result}\n')
+
                 except ZeroDivisionError:
-                    redistributed_correspondences[i][j] = 'div/zero'
+                    redistributed_correspondences[i][j] = ''
                 except KeyError:
-                    redistributed_correspondences[i][j] = 'None'
+                    redistributed_correspondences[i][j] = ''
 
         return Result('10x10', 'Перерозподілені кореспонденції', redistributed_correspondences)
 
-    def __build_network(self, builder):
-        while True:
-            routes = builder.build_network()
+    def __build_network(self):
+        logger.clear_room('6.2')
+        logger.clear_room('6.3')
 
-            connections = self.__check_routes(routes)
-            self.results.update({'connections': connections})
+        if not self.__routes and self.auto_build_routes:
+            builder = RouteNetworkBuilder(self, routes_count=5, avg_route_length=6, network_efficiency=0.6, stack_size=50)
+            self.__routes = builder.build_network()
 
-            redistributed_correspondences = self.__redistribute_correspondences(self.results['corrected_correspondences'].result, connections.result)
-            self.results.update({'redistributed_correspondences': redistributed_correspondences})
+        connections = self.__check_routes(self.__routes)
+        self.results.update({'connections': connections})
 
-            count_connections = self.__count_connections(connections.result)
+        logger.write_into('6.2', '\nФормула (6.2) Перерозподіл міжрайонних кореспонденцій для всіх маршрутів\n')
+        redistributed_correspondences = self.__redistribute_correspondences(self.results['corrected_correspondences'].data, connections.data)
+        self.results.update({'redistributed_correspondences': redistributed_correspondences})
 
-            # self.__calculate_routes_efficiency(routes)
-            # print(numbers)
-            self.__calculate_passenger_flows_on_routes(routes)
-            network_efficiency = sum(route.calculate_route_efficiency() for route in routes.values()) / D(len(routes))
-            print(network_efficiency)
+        count_connections = self.__count_connections(connections.data)
+        print('count_connections (how many zeros)', count_connections)
 
-            if count_connections[0] <= D('20') and network_efficiency > D('0.6'):    # TODO: get this value from command line
-                break
+        # self.__calculate_efficiency_on_routes(self.__routes)
+        self.__calculate_passenger_flows_on_routes(self.__routes)
 
-        return routes
+        if count_connections[0] >= D('20') and any(map(lambda route: route.efficiency() <= 0.6, self.__routes.values())):    # TODO: get this values from command line
+            self.__routes = {}
+            self.__build_network()
+
+        network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))
+        print('Network efficiency', network_efficiency)
 
     def __test_calculate_passenger_flows_on_all_routes(self):
         from route_builder import Route
@@ -450,13 +529,13 @@ class Graph(object):
 
         return passenger_flows
 
-    def __calculate_passenger_flows_on_routes(self, routes, missed_flows=None):
+    def __calculate_passenger_flows_on_routes(self, routes, missed_flows=None, force=False):
         for route_num, route_obj in routes.items():
-            route_obj.calculate_passenger_flow(missed_flows=missed_flows)
+            route_obj.calculate_passenger_flow(missed_flows=missed_flows, force=force)
 
-    def __calculate_routes_efficiency(self, routes):
+    def __calculate_efficiency_on_routes(self, routes, force=False):
         for route_num, route_obj in routes.items():
-            route_obj.calculate_route_efficiency()
+            route_obj.efficiency(force=force)
 
     def __calculate_transplantation_rate(self, connections, correspondences):
         transplantation_correspondences = D('0')
@@ -475,6 +554,7 @@ class Graph(object):
 
         correspondences_sum = sum(self.__collect_values(correspondences))
         transplantation_rate = round((correspondences_sum + transplantation_correspondences) / correspondences_sum, 2)
+        logger.write_into('MAIN', f'kпер = ({correspondences_sum} + {transplantation_correspondences}) / {correspondences_sum} = {transplantation_rate}\n')
         return transplantation_rate
 
     def __find_shortest_path_by_routes(self, start, end, routes_per_line, graph=None):
@@ -522,104 +602,158 @@ class Graph(object):
 
         return Result('12x12', 'Неврахований потік', missed_flows)
 
+    def __accumulate_table_6_15(self, routes):
+        table = []
+        for route in routes: table += route.missed_flow_table_part()
+        return table
+
+    def __log_missed_flow(self, connections, correspondences):
+        for i in self.NODES:
+            for j in self.NODES:
+
+                if int(i) > int(j):
+                    continue
+
+                try:
+                    if connections[i][j] == 0:
+                        logger.write_into('MAIN', f'- {i}-{j} (пасажиропотік {correspondences[i][j]}), {j}-{i} (пасажиропотік {correspondences[j][i]})\n')
+                except KeyError:
+                    pass
+
     def calculate(self, create_xls=True):
+        logger.write_into('MAIN', 'Формула (1.1) Найкоротші відстані та шляхи\n', create_if_not_exist=True)
         lens, paths = self.__calculate_lens_and_paths()
         self.results.update({'lens': lens})
         self.results.update({'paths': paths})
 
-        Dij = self.__calculate_Dij(lens.result, self.flows)
-        correspondences = self.__calculate_correspondences(self.flows, Dij.result)
+        logger.write_into('MAIN', '\nФормула (2.3) Проміжна матриця і Трудність сполучення\n')
+        Dij, Cij = self.__calculate_Dij_and_Cij(lens.data, self.flows)
+
+        logger.write_into('MAIN', '\nФормула (2.6) Кореспонденції\n')
+        correspondences = self.__calculate_correspondences(self.flows, Dij.data)
         self.results.update({'Dij': Dij})
+        self.results.update({'Cij': Cij})
         self.results.update({'correspondences': correspondences})
 
-        before_delta_j, correction_coefs = self.__calculate_delta_j_and_correction_coefs(self.flows, correspondences.result)
+        logger.write_into('MAIN', '\nФормула (2.8) (2.9)\n')
+        self.__test_correspondences(correspondences.data)
+
+        # Таблиця 2.4
+        table = {
+            'Номер_ТР': [int(node) for node in self.NODES],
+            'HOi_дане': [int(self.flows[n]['creation']) for n in self.NODES],
+            'HOi_пораховане': [int(self.__calculate_matrix_row(i, correspondences.data)) for i in self.NODES]
+        }
+        self.results.update({'Таблиця 2.4': Result('pandas', 'Таблиця 2.4', table, transpose=True, convert_to_int=True)})
+
+        # Таблиця 2.5
+        table = {
+            'Номер_ТР': [int(node) for node in self.NODES],
+            'HPj_дане': [int(self.flows[n]['absorption']) for n in self.NODES],
+            'HPj_пораховане': [int(self.__calculate_matrix_column(j, correspondences.data)) for j in self.NODES]
+        }
+        self.results.update({'Таблиця 2.5': Result('pandas', 'Таблиця 2.5', table, transpose=True, convert_to_int=True)})
+
+        logger.write_into('MAIN', '\nФормула (2.10) (2.11)\n')
+        before_delta_j, correction_coefs = self.__calculate_delta_j_and_correction_coefs(self.flows, correspondences.data)
         self.results.update({'before_delta_j': before_delta_j})
         self.results.update({'correction_coefs': correction_coefs})
 
-        corrected_Dij = self.__calculate_Dij(lens.result, self.flows, correction_coefs=correction_coefs.result)
-        corrected_correspondences = self.__calculate_correspondences(self.flows, corrected_Dij.result)
+        corrected_Dij, _ = self.__calculate_Dij_and_Cij(lens.data, self.flows, correction_coefs=correction_coefs.data)
+        corrected_correspondences = self.__calculate_correspondences(self.flows, corrected_Dij.data, log=False)
         self.results.update({'corrected_Dij': corrected_Dij})
         self.results.update({'corrected_correspondences': corrected_correspondences})
 
-        after_delta_j = self.__calculate_delta_j_and_correction_coefs(self.flows, corrected_correspondences.result, calc_correction_coefs=False)
+        after_delta_j = self.__calculate_delta_j_and_correction_coefs(self.flows, corrected_correspondences.data, calc_correction_coefs=False)
         self.results.update({'after_delta_j': after_delta_j})
 
-        transport_work = self.__calculate_transport_work(corrected_correspondences.result, lens.result)
-        min_transport_work = self.__calculate_min_transport_work(transport_work.result)
+        logger.write_into('MAIN', '\nФормула (3.2) Мінімальна транспортна робота\n')
+        transport_work = self.__calculate_transport_work(corrected_correspondences.data, lens.data)
+        min_transport_work = self.__calculate_min_transport_work(transport_work.data)
         self.results.update({'transport_work': transport_work})
-        self.results.update({'min_transport_work': min_transport_work})
+        # self.results.update({'min_transport_work': min_transport_work})
 
-        passenger_flows = self.__calculate_passenger_flows(paths.result, corrected_correspondences.result)
+        logger.write_into('MAIN', '\nФормула (4.1) Пасажиропотік\n')
+        passenger_flows = self.__calculate_passenger_flows(paths.data, corrected_correspondences.data)
         self.results.update({'passenger_flows': passenger_flows})
 
-        straight_and_reverse_flow = self.__calculate_straight_and_reverse_passenger_flow(passenger_flows.result)
+        straight_and_reverse_flow = self.__calculate_straight_and_reverse_passenger_flow(passenger_flows.data)
         self.results.update({'straight_and_reverse_flow': straight_and_reverse_flow})
 
-        general_pas_flow = self.__calculate_general_pas_flow(passenger_flows.result, lens.result)
-        self.results.update({'general_pas_flow': general_pas_flow})
+        logger.write_into('MAIN', '\nФормула (4.2) Перевірка на основі пасажиропотоків (з допомогою транспортної роботи)\n')
+        transport_work_per_line = self.__calculate_transport_work_per_line(passenger_flows.data, lens.data)
+        self.results.update({'Таблиця 4.1': transport_work_per_line})
 
-        recommendations = self.__make_recommendations(passenger_flows.result)
+        logger.write_into('MAIN', '\nФормула (5.1)\n')
+        recommendations = self.__make_recommendations(passenger_flows.data)
         self.results.update({'recommendations': recommendations})
 
-        if self.auto_build_routes:
-            builder = RouteNetworkBuilder(self, routes_count=5, avg_route_length=6, network_efficiency=0.6, stack_size=50)
-            routes = self.__build_network(builder)
+        self.__build_network()
+        # TODO: add summary table with routes efficiencies
 
-        elif self.__routes:
+        # Таблиця 5.5
+        table = {
+            'Маршрут': [str(route) for route in self.__routes.values()],
+            'Довжина_маршруту': [route.length() for route in self.__routes.values()]
+        }
+        self.results.update({'Таблиця 5.5': Result('pandas', 'Таблиця 5.5', table)})
 
-            connections = self.__check_routes(self.__routes)
-            self.results.update({'connections': connections})
+        for route_num, route_obj in self.__routes.items():
+            self.results.update({
+                f'route{route_num}': Result(
+                    'route',
+                    f'Маршрут №{route_num}',
+                    deepcopy(route_obj)     # we need different frames of same routes
+                )
+            })
 
-            count_connections = self.__count_connections(connections.result)
-            print('count_connections (how many zeros)', count_connections)
+        logger.write_into('MAIN', '\nФормула (5.2) Коефіцієнт пересаджування\n')
+        transplantation_rate = self.__calculate_transplantation_rate(self.results['connections'].data, corrected_correspondences.data)
+        print('transplantation_rate', transplantation_rate)
 
-            routes_per_line = self.__count_routes_per_line(self.__routes)
-            # self.results.update({'routes_per_line': routes_per_line})
+        logger.merge_rooms('MAIN', ['6.2', '6.3'])
 
-            possibilities_to_cut_routes = self.__find_possibilities_to_cut_routes(self.results['recommendations'].result, routes_per_line.result)
-            # print(possibilities_to_cut_routes)
+        # Таблиця 6.14
+        table_6_14 = {'Маршрут': range(1, len(self.__routes)+1), 'Коефіцієнт_ефективності': [route.efficiency() for route in self.__routes.values()]}
+        self.results.update({'Таблиця 6.14': Result('pandas', 'Таблиця 6.14', table_6_14, transpose=True)})
 
-            redistributed_correspondences = self.__redistribute_correspondences(self.results['corrected_correspondences'].result, connections.result)
-            self.results.update({'redistributed_correspondences': redistributed_correspondences})
+        logger.write_into('MAIN', '\nРайони, які між собою не з\'єднані жодним маршрутом\n')
+        self.__log_missed_flow(self.results['connections'].data, corrected_correspondences.data)
 
-            self.__calculate_passenger_flows_on_routes(self.__routes)
-            # self.__calculate_routes_efficiency(self.__routes)
-            network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))
-            print('Network efficiency', network_efficiency)
+        routes_per_line = self.__count_routes_per_line(self.__routes)
+        # possibilities_to_cut_routes = self.__find_possibilities_to_cut_routes(self.results['recommendations'].data, routes_per_line.data)
+        # print(possibilities_to_cut_routes)
 
-            for route_num, route_obj in self.__routes.items():
-                self.results.update({
-                    f'route{route_num}': Result(
-                        'route',
-                        f'Маршрут №{route_num}',
-                        deepcopy(route_obj)
-                    )
-                })
+        missed_flows = self.__calculate_missed_flows(self.results['connections'].data, self.results['corrected_correspondences'].data, routes_per_line.data)
+        self.results.update({'missed_flows': missed_flows})
 
-            transplantation_rate = self.__calculate_transplantation_rate(connections.result, corrected_correspondences.result)
-            print('transplantation_rate', transplantation_rate)
+        total_missed_flow = sum(self.__collect_values(missed_flows.data))
+        logger.write_into('MAIN', f'Сформовані маршрути не враховують {total_missed_flow} пасажирів\n')
+        print('missed_flows', total_missed_flow)
 
-            missed_flows = self.__calculate_missed_flows(connections.result, corrected_correspondences.result, routes_per_line.result)
-            print('missed_flows', sum(self.__collect_values(missed_flows.result)))
-            self.results.update({'missed_flow': missed_flows})
+        self.__calculate_passenger_flows_on_routes(self.__routes, missed_flows=missed_flows.data)
+        self.__calculate_efficiency_on_routes(self.__routes, force=True)
 
-            self.__calculate_passenger_flows_on_routes(self.__routes, missed_flows=missed_flows.result)
-            # self.__calculate_routes_efficiency(self.__routes)
-            network_efficiency = sum(route.calculate_route_efficiency() for route in self.__routes.values()) / len(self.__routes)
-            print('Network efficiency after including', network_efficiency)
+        network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / len(self.__routes)
+        print('Network efficiency after including', network_efficiency)
 
-            # calculation of rational bus capacities on routes
-            # TODO: write logger with all formulas and values
-            # TODO: maybe write docx auto generation in further
+        logger.merge_rooms('MAIN', ['6.3'])
 
-            for route_num, route_obj in self.__routes.items():
-                self.results.update({
-                    f'route{route_num}_missed_included': Result(
-                        'route',
-                        f'Маршрут №{route_num} (Із неврахованими)',
-                        route_obj
-                    )
-                })
+        # calculation of rational bus capacities on routes
+        # TODO: maybe write docx auto generation in further
+
+        # Таблиця 6.15
+        self.results.update({'Таблиця 6.15': Result('rows', 'Таблиця 6.15', self.__accumulate_table_6_15(self.__routes.values()))})
+
+        for route_num, route_obj in self.__routes.items():
+            self.results.update({
+                f'route{route_num}_missed_included': Result(
+                    'route',
+                    f'Маршрут №{route_num} (Із неврахованими)',
+                    route_obj,
+                    include_missed_flow_chart=True
+                )
+            })
 
     # helper functions
 

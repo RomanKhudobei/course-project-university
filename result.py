@@ -1,17 +1,20 @@
+import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, Border, Side
-from openpyxl.chart import LineChart, Reference, BarChart, ScatterChart, Series, series_factory as sf
+from openpyxl.chart import LineChart, Reference, BarChart, ScatterChart, Series
+import xlsxwriter as xls    # TODO: Rewrite in xlsxwriter
 
 
 class Result(object):
-    RESULT_TYPES = ('12x12', '10x10', '1x10', 'route', 'single')
+    RESULT_TYPES = ('12x12', '10x10', '1x10', 'route', 'single', 'pandas', 'rows')
 
-    def __init__(self, rtype, title='Title', result={}):
+    def __init__(self, rtype, title='Title', result={}, **kwargs):
         assert rtype in self.RESULT_TYPES, f'Type {rtype} is not valid'
         self.rtype = rtype  # TODO: type(<Result object at 0x063278ff>) if possible
         assert title, 'Title cannot be empty'
         self.title = str(title)
-        self.result = result
+        self.data = result
+        self.extra = kwargs
 
 
 class ExcelResultsWriter(object):
@@ -31,7 +34,9 @@ class ExcelResultsWriter(object):
             '10x10': self.__write_table10x10,
             '1x10': self.__write_table1x10,
             'route': self.__write_route,
-            'single': self.__write_single
+            'single': self.__write_single,
+            'pandas': self.__write_by_pandas,
+            'rows': self.__write_rows
         }
 
     def write2excel(self, filename):
@@ -41,7 +46,7 @@ class ExcelResultsWriter(object):
 
         for result in self.results.values():
             ws = wb.create_sheet(result.title)
-            self.rtype_to_method[result.rtype](ws, result.title, result.result)
+            self.rtype_to_method[result.rtype](ws, result.title, result.data, **result.extra)
 
         # change width of columns in order to properly see large data
         ws = wb['Шляхи']
@@ -144,22 +149,66 @@ class ExcelResultsWriter(object):
             cell = ws.cell(row=3, column=int(j) + 1, value=value)  # round here to have more accurate results
             cell.border = self.border
 
-    def __write_route(self, ws, name, route_obj):
-        ws.cell(row=1, column=1, value=name)
-
-        ws.cell(row=2, column=1, value=str(route_obj))
+    def __write_route(self, ws, name, route_obj, **kwargs):
+        LAST_ROW = 0
+        ws.append([name, str(route_obj)])
+        LAST_ROW += 1
+        ws.append(['Ефективність', route_obj.efficiency()])
+        LAST_ROW += 1
         ws.append([])
+        LAST_ROW += 1
         ws.append(['Напрям перегону'] + ['-'.join(arc) for arc in route_obj.arcs])
+        LAST_ROW += 1
         ws.append(['Прямий напрям'] + [route_obj.passenger_flow[i][j] for i, j in route_obj.arcs])
+        LAST_ROW += 1
         ws.append(['Зворотній напрям'] + [route_obj.passenger_flow[j][i] for i, j in route_obj.arcs])
+        LAST_ROW += 1
+        ws.append([])
+        LAST_ROW += 1
+
+        if kwargs.get('include_missed_flow_chart'):
+            ws.append(['Дані до епюри неврахованого пасажиропотоку (До рисунку 6.7)'])
+            LAST_ROW += 1
+            for row in route_obj.missed_flow_table_part():
+                ws.append(row)
+                LAST_ROW += 1
+
+            missed_flow_chart = ScatterChart()
+            missed_flow_chart.style = 10
+            missed_flow_chart.title = 'Епюра неврахованого пасажиропотоку'
+            missed_flow_chart.y_axis.title = 'Пасажиропотік'
+            missed_flow_chart.x_axis.title = 'Перегон маршруту'
+
+            xvalues = Reference(ws, min_col=2, min_row=9, max_col=len(route_obj.arcs)+1, max_row=9)    # x axis labels
+
+            values1 = Reference(ws, min_col=1, min_row=10, max_col=len(route_obj.arcs)+1, max_row=10)   # data for chart
+            values2 = Reference(ws, min_col=1, min_row=11, max_col=len(route_obj.arcs)+1, max_row=11)
+
+            s1 = Series(values1, xvalues, title_from_data=True)
+            s2 = Series(values2, xvalues, title_from_data=True)
+
+            missed_flow_chart.series.append(s1)
+            missed_flow_chart.series.append(s2)
+
+            missed_flow_chart.shape = 4
+
+            ws.append([])
+            LAST_ROW += 1
+
+        for row in route_obj.slice_from_redistributed_correspondences(heading=f"{'Доповнена матриця міжрайонних кореспонденцій для маршруту' if kwargs.get('include_missed_flow_chart') else 'Матриця міжрайонних кореспонденцій для маршруту'}"):
+            ws.append(row)
+            LAST_ROW += 1
+
+        ws.append([])
+        LAST_ROW += 1
 
         chart = ScatterChart()
         chart.style = 10
-        chart.title = 'Пасажиропотік'
+        chart.title = 'Епюра пасажиропотоку'
         chart.y_axis.title = 'Пасажиропотік'
-        chart.x_axis.title = 'Перегони маршруту'
+        chart.x_axis.title = 'Перегон маршруту'
 
-        xvalues = Reference(ws, min_col=2, min_row=4, max_col=len(route_obj.arcs)+1, max_row=4)    # x axis values
+        xvalues = Reference(ws, min_col=2, min_row=4, max_col=len(route_obj.arcs)+1, max_row=4)    # x axis labels
 
         values1 = Reference(ws, min_col=1, min_row=5, max_col=len(route_obj.arcs)+1, max_row=5)   # data for chart
         values2 = Reference(ws, min_col=1, min_row=6, max_col=len(route_obj.arcs)+1, max_row=6)
@@ -171,11 +220,17 @@ class ExcelResultsWriter(object):
         chart.series.append(s2)
 
         chart.shape = 4
-        ws.add_chart(chart, 'A8')
-        self.__write_route2(ws, name, route_obj)
+
+        if kwargs.get('include_missed_flow_chart'):
+            ws.add_chart(missed_flow_chart, f'A{LAST_ROW+1}')
+            LAST_ROW += 15
+
+        ws.add_chart(chart, f"A{LAST_ROW+1}")
+        LAST_ROW += 15
+
+        # self.__write_route2(ws, name, route_obj)
 
     def __write_route2(self, ws, name, route_obj):
-        import xlsxwriter as xls    # TODO: Rewrite in xlsxwriter
         wb = xls.Workbook(f"{name}.xlsx")
         ws = wb.add_worksheet()
 
@@ -187,7 +242,7 @@ class ExcelResultsWriter(object):
 
         # chart = wb.add_chart({'type': 'column'})
         chart = wb.add_chart({'type': 'line'})
-        print()
+
         chart.add_series({
             'name': '=Sheet1!$A$2',
             'categories': '=Sheet1!$B$1:$F$1',
@@ -204,48 +259,54 @@ class ExcelResultsWriter(object):
 
         wb.close()
 
-    def __write2xN(self, ws, name, data):
+    def __write_by_pandas(self, ws, name, data, **kwargs):
         # writing table title
-        ws.cell(row=1, column=1, value=name)
+        ws.append([name])
 
-        # ws.cell(row=2, column=1, value='Напрям перегону')
-        ws.append(['Напрям перегону'] + data.arcs)
-        ws.cell(row=3, column=1, value='Прямий напрямок')
-        ws.cell(row=4, column=1, value='Зворотній напрямок')
+        if type(data) != pd.DataFrame:
+            table = pd.DataFrame.from_dict(data)
+            table.index = ('' for _ in range(len(data[list(data.keys())[0]])))  # len of column/row (table consistency assumed)
 
-        col_offset = 1
-        row_offset = 2
+        if kwargs.get('transpose'):
+            table = table.T
 
-        col_indexes = (i for i in range(1, len(data)+1))
+        rows = list(row.split() for row in table.to_string().split('\n'))
 
-        for i in (str(i) for i in range(1, 13)):
-            for j in (str(j) for j in range(1, 13)):
+        if kwargs.get('transpose'):
+            rows[0] = [''] + rows[0]    # add column offset to column indexes (compensate row indexes)
 
-                pass_flow_straight = data.get(i, {}).get(j)
-                pass_flow_reverse = data.get(j, {}).get(i)
+        for row in rows:
 
-                if not pass_flow_straight and not pass_flow_reverse:
-                    continue
+            if kwargs.get('convert_to_int'):
+                row = [int(value) if value.isdigit() else value for value in row]
 
-                try:
-                    col_index = next(col_indexes)
-                except StopIteration:
-                    break
-
-                if pass_flow_straight:
-                    ws.cell(
-                        row=1+row_offset,
-                        column=col_index+col_offset,
-                        value=pass_flow_straight
-                    )
-
-                if pass_flow_reverse:
-                    ws.cell(
-                        row=2+row_offset,
-                        column=col_index+col_offset,
-                        value=pass_flow_reverse
-                    )
+            ws.append(row)
 
     def __write_single(self, ws, name, data):
         ws.cell(row=1, column=1, value=name)
         ws.cell(row=2, column=1, value=data)
+
+    def __write_rows(self, ws, name, data):
+        ws.append([name])
+        for row in data: ws.append(row)
+
+
+class XlsxResultsWriter(object):
+
+    def __init__(self, results):
+        self.results = results
+        self.data_type_to_method = {
+            'table': self.__write_table
+        }
+
+    def write2excel(self, filename):
+        wb = xls.Workbook(filename)
+
+        for result in self.results.values():
+            ws = wb.add_worksheet(name=result.title)
+            self.data_type_to_method[result.data_type](ws, result.title, result.data)
+
+        wb.close()
+
+    def __write_table(self, ws, name, data):
+        ws.write_row()

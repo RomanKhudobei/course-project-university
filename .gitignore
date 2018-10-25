@@ -7,3 +7,4 @@ to_take_from.py
 __pycache__
 .idea*
 venv*
+*log.txt
