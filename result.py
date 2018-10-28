@@ -260,6 +260,7 @@ class ExcelResultsWriter(object):
         wb.close()
 
     def __write_by_pandas(self, ws, name, data, **kwargs):
+        pd.set_option('display.max_colwidth', -1)
         # writing table title
         ws.append([name])
 
