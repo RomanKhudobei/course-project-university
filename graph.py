@@ -267,16 +267,30 @@ class Graph(object):
 
                 # maybe it don't even cause an mistake on calculations
 
+                # AFTER CHECK 2:
+                # everything seems to work fine...
+
+                # Де береться пасажиропотік 11, 12?
+                # Практичне пояснення: Це ті пасажири які проїжджають з точки i в j через 11 або 12
+                # Алгоритм:
+                # Ми ітеруємось по матриці найкоротших шляхів
+                # Якщо перегін є в найкоротшому шляху
+                # То ми кореспонденцію цього шляху додаємо до пасажиропотоку перегону
+                # (Кореспонденція - це кількість людей, що рухається з точки i/m/a до j/n/b)
+
                 pas_flow = D('0')
                 between = []
 
+                # assumed that no one ride to nodes `11` and `12`
                 for m in self.NODES:
                     for n in self.NODES:
 
                         if (i, j) in self.__get_arcs(paths[m][n]):
                             try:
                                 pas_flow += correspondences[m][n]
-                                between.append(str(correspondences[m][n]))
+                                between.append(
+                                    (f'H{m}-{n}', str(correspondences[m][n]))
+                                )
 
                             except KeyError:
                                 continue
@@ -285,7 +299,7 @@ class Graph(object):
                 passenger_flows[i][j] = result
 
                 if between:
-                    logger.write_into('MAIN', f"Q{i}-{j} = {' + '.join(between)} = {result}\n")
+                    logger.write_into('MAIN', f"Q{i}-{j} = {' + '.join(data[0] for data in between)} = {' + '.join(data[1] for data in between)} = {result}\n")
 
         return Result('12x12', 'Пасажиропотік', passenger_flows)
 
