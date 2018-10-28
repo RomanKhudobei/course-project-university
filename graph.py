@@ -306,7 +306,6 @@ class Graph(object):
 
     def __calculate_transport_work_per_line(self, passenger_flows, lens):
         transport_work_per_line = {'Перегони': [], 'Транспортна_робота': []}  # different structure for pandas
-
         restrict_log = len(config.RESTRICT_LOG)
 
         for i in passenger_flows:
@@ -395,17 +394,15 @@ class Graph(object):
         self.results.update({'redistributed_correspondences': redistributed_correspondences})
 
         count_connections = self.__count_connections(connections.data)
-        print('count_connections (how many zeros)', count_connections)
 
         # self.__calculate_efficiency_on_routes(self.__routes)
         self.__calculate_passenger_flows_on_routes(self.__routes)
 
-        if count_connections[0] >= D('20') and any(map(lambda route: route.efficiency() <= 0.6, self.__routes.values())):    # TODO: get this values from command line
+        if (count_connections[0] >= D('20') or any(map(lambda route: route.efficiency() < 0.6, self.__routes.values()))) and self.auto_build_routes:    # TODO: get this values from command line
             self.__routes = {}
-            self.__build_network()
+            return self.__build_network()
 
-        network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))
-        print('Network efficiency', network_efficiency)
+        return count_connections
 
     def __test_calculate_passenger_flows_on_all_routes(self):
         from route_builder import Route
@@ -688,7 +685,10 @@ class Graph(object):
         recommendations = self.__make_recommendations(passenger_flows.data)
         self.results.update({'recommendations': recommendations})
 
-        self.__build_network()
+        count_connections = self.__build_network()
+        print('count_connections (how many zeros)', count_connections)
+        network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))
+        print('Network efficiency', network_efficiency)
         # TODO: add summary table with routes efficiencies
 
         # Таблиця 5.5
@@ -714,8 +714,8 @@ class Graph(object):
         logger.merge_rooms('MAIN', ['6.2', '6.3'])
 
         # Таблиця 6.14
-        table_6_14 = {'Маршрут': range(1, len(self.__routes)+1), 'Коефіцієнт_ефективності': [route.efficiency() for route in self.__routes.values()]}
-        self.results.update({'Таблиця 6.14': Result('pandas', 'Таблиця 6.14', table_6_14, transpose=True)})
+        data = {'Маршрут': range(1, len(self.__routes)+1), 'Коефіцієнт_ефективності': [route.efficiency() for route in self.__routes.values()]}
+        self.results.update({'Таблиця 6.14': Result('pandas', 'Таблиця 6.14', data, transpose=True)})
 
         logger.write_into('MAIN', '\nРайони, які між собою не з\'єднані жодним маршрутом\n')
         self.__log_missed_flow(self.results['connections'].data, corrected_correspondences.data)
@@ -819,8 +819,14 @@ class Graph(object):
     def __is_valid_graph(self, graph):
         for i in graph:
             for j in graph[i]:
-                if graph[i][j] != graph[j][i]:
-                    return False
+
+                try:
+                    if graph[i][j] != graph[j][i]:
+                        return False
+
+                except KeyError:
+                    raise ValueError('Invalid graph')
+
         return True
 
     def __test_creation_equal_absorption(self, flows):
