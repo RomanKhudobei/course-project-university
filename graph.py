@@ -769,6 +769,11 @@ class Graph(object):
                 )
             })
 
+        # Таблиця 6.28
+        data.update({'Коефіцієнт_ефективності_до_дозавантаження_маршрутів': data.pop('Коефіцієнт_ефективності')})
+        data.update({'Коефіцієнт_ефективності_після_дозавантаження_маршрутів': [route.efficiency() for route in self.__routes.values()]})
+        self.results.update({'Таблиця 6.28': Result('pandas', 'Таблиця 6.28', data, transpose=True)})
+
     # helper functions
 
     def __calculate_matrix_column(self, j, matrix):
