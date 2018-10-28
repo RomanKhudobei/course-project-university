@@ -199,6 +199,7 @@ class Route(object):
         max_pass_flow = max(self.__collect_values(self.passenger_flow))
 
         bus_capacity = round(max_pass_flow * interval / 60, 0)
+        logger.write_into('MAIN', f'\n(Для маршруту {self})\nqn = {max_pass_flow} * {interval} / 60 = {bus_capacity}\n')
 
         self.rational_bus_capacity['by_interval'].update({interval: bus_capacity})
         return bus_capacity
