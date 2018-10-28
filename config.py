@@ -2,6 +2,10 @@ from decimal import ROUND_HALF_UP
 from decimal import Decimal as D
 
 
+NODES = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
+NODES_12 = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12')
+
+
 DEFAULT_ROUNDING_RULE = ROUND_HALF_UP
 
 
@@ -14,6 +18,7 @@ RESTRICT_LOG = [
     ('1', '3')
 ]
 
+# RESTRICT_LOG = [(i, j) for i in NODES_12 for j in NODES_12]
 
 # next semester, new course project
 MY_GRAPH = {
@@ -315,10 +320,6 @@ STAHIV_GRAPH = {
 }
 
 
-NODES = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
-NODES_12 = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12')
-
-
 MY_FLOWS = {
     '1': {
         'absorption': 1800,
@@ -454,7 +455,7 @@ PASHA_GRAPH = {
     },
     '10': {
         '1': D('1.7'),
-        '10': D('2.2')
+        '9': D('2.2'),
     },
     '11': {
         '1': D('1.6'),
