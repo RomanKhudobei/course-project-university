@@ -213,7 +213,13 @@ class Route(object):
         for (min_pass_flow, max_pass_flow), (min_capacity, max_capacity) in self.PASSENGER_FLOW_TO_BUS_CAPACITY.items():
 
             if min_pass_flow <= max_route_pass_flow <= max_pass_flow:
-                bus_capacity = min_capacity + ((max_route_pass_flow - min_pass_flow) * (max_capacity - min_capacity) / (max_capacity - min_capacity))
+                bus_capacity = round(min_capacity + (
+                        (max_route_pass_flow - min_pass_flow) * (max_capacity - min_capacity) / (max_pass_flow - min_pass_flow)
+                ), 0)
+
+                logger.write_into('MAIN', f'\n(Для маршруту {self})\nqn = {min_capacity} + ('
+                                          f'({max_route_pass_flow} - {min_pass_flow}) * ({max_capacity} - {min_capacity}) / ({max_pass_flow} - {min_pass_flow})'
+                                          f') = {bus_capacity}\n')
 
         if bus_capacity is None:
             raise ValueError(f'Route passenger flow out of range ({max_route_pass_flow})')

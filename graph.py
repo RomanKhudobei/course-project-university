@@ -635,6 +635,10 @@ class Graph(object):
         for route in routes:
             route.rational_bus_capacity_by_interval(interval=interval)
 
+    def __calculate_rational_bus_capacity_by_passenger_flow(self, routes):
+        for route in routes:
+            route.rational_bus_capacity_by_passenger_flow()
+
     def calculate(self, create_xls=True):
         logger.write_into('MAIN', 'Формула (1.1) Найкоротші відстані та шляхи\n', create_if_not_exist=True)
         lens, paths = self.__calculate_lens_and_paths()
@@ -780,11 +784,11 @@ class Graph(object):
 
         logger.write_into('MAIN', f'\nФормула (7.1) Раціональна номінальна пасажиромісткість автобуса виходячи з доцільного інтерувалу руху\n')
         self.__calculate_rational_bus_capacity_by_interval_on_routes(self.__routes.values(), interval=4)
-        logger.write_into('MAIN', f'\nОтримані значення раціональної номінальної пасажиромісткості автобусів ' +
-                                    'залежать від максимального пасажиропотоку на маршруті і від інтервалу руху ' +
-                                    'автобусів (I = 4 хв.). Але в реальних умовах на інтервалу руху вливають дорожні ' +
-                                    'умови (затори, стан дорожнього покриття), погодно-кліматичні умови (ожеледиця, ' +
-                                    'туман) та інші чинники. Тому проведемо аналогічні розрахунки раціональної ' +
+        logger.write_into('MAIN', f'\nОтримані значення раціональної номінальної пасажиромісткості автобусів\n' +
+                                    'залежать від максимального пасажиропотоку на маршруті і від інтервалу руху\n' +
+                                    'автобусів (I = 4 хв.). Але в реальних умовах на інтервалу руху вливають дорожні\n' +
+                                    'умови (затори, стан дорожнього покриття), погодно-кліматичні умови (ожеледиця,\n' +
+                                    'туман) та інші чинники. Тому проведемо аналогічні розрахунки раціональної\n' +
                                     'номінальної пасажиромісткості автобусів для інтервалу руху I = 8 хв.\n')
         self.__calculate_rational_bus_capacity_by_interval_on_routes(self.__routes.values(), interval=8)
 
@@ -795,6 +799,10 @@ class Graph(object):
             'Пасажиромісткість_при_інтервалі_8': [route.rational_bus_capacity['by_interval'][8] for route in self.__routes.values()]
         }
         self.results.update({'Таблиця 7.1': Result('pandas', 'Таблиця 7.1', data, transpose=True)})
+
+        logger.write_into('MAIN', f'\nФормула (7.2) Залежність місткості автобуса від потужності пасажиропотоку\n')
+        self.__calculate_rational_bus_capacity_by_passenger_flow(self.__routes.values())
+
 
     # helper functions
 
