@@ -389,13 +389,23 @@ def calculate_total_expenses(maintain_expenses, transport_expenses, capital_expe
         write_log('{}\n\n'.format('_'*50))
     return maintain_expenses, transport_expenses, total_expenses, coefs_kt
 
+def find_bad_roads(road_classes):
+    bad_roads = []
+
+    for i in road_classes:
+        for j in road_classes[i]:
+            if config.ROAD_CLASS_PRIORITY[road_classes[i][j]] < config.ROAD_CLASS_PRIORITY['C']:
+                bad_roads.append((i, j))
+
+    return bad_roads
+
 def update_stripes(stripes_quantity, roads_upd):
     stripes_quantity_upd = deepcopy(stripes_quantity)
     for i, j in roads_upd:
-        stripes_quantity_upd[i][j] = 2
+        stripes_quantity_upd[i][j] += 1
     return stripes_quantity_upd
 
-def set_class_road(coefs_overload):
+def set_class_road_by_overload(coefs_overload):
     road_classes = {}
 
     for i in coefs_overload:
@@ -406,8 +416,56 @@ def set_class_road(coefs_overload):
 
             if coefs_overload[i][j] <= 0.6:
                 road_classes[i][j] = 'A'
-            else:
+
+            elif coefs_overload[i][j] <= 0.7:
+                road_classes[i][j] = 'B'
+
+            elif coefs_overload[i][j] <= 0.8:
+                road_classes[i][j] = 'C'
+
+            elif coefs_overload[i][j] <= 0.9:
+                road_classes[i][j] = 'D'
+
+            elif coefs_overload[i][j] <= 1:
+                road_classes[i][j] = 'E'
+
+            elif 0 < coefs_overload[i][j] < 1:
                 road_classes[i][j] = 'F'
+
+            else:
+                raise ValueError('Class road out of range')
+
+    return road_classes
+
+def set_class_road_by_speed(transport_streams_speed):
+    road_classes = {}
+
+    for i in transport_streams_speed:
+
+        road_classes[i] = {}
+
+        for j in transport_streams_speed[i]:
+
+            if transport_streams_speed[i][j] >= 48:
+                road_classes[i][j] = 'A'
+
+            elif transport_streams_speed[i][j] >= 40:
+                road_classes[i][j] = 'B'
+
+            elif transport_streams_speed[i][j] >= 32:
+                road_classes[i][j] = 'C'
+
+            elif transport_streams_speed[i][j] >= 24:
+                road_classes[i][j] = 'D'
+
+            elif transport_streams_speed[i][j] >= 16:
+                road_classes[i][j] = 'E'
+
+            elif 0 < transport_streams_speed[i][j] < 16:
+                road_classes[i][j] = 'F'
+
+            else:
+                raise ValueError('Class road out of range')
 
     return road_classes
 
@@ -674,9 +732,10 @@ def main():
     coefs_overload = calculate_coefs_overload(transport_intensity, stripes_quantity, stripe_bandwidth)
     mds['Коефiцiєнти завантаження дороги'] = coefs_overload
 
-    road_classes = set_class_road(coefs_overload)  # thus for table 3
+    road_classes_by_overload = set_class_road_by_overload(coefs_overload)  # thus for table 3
+    road_classes_by_speeds = set_class_road_by_speed(transport_streams_speed)
 
-    table3 = build_table3(stripes_quantity, transport_intensity, transport_streams_speed, coefs_overload, road_classes)
+    table3 = build_table3(stripes_quantity, transport_intensity, transport_streams_speed, coefs_overload, road_classes_by_speeds)
 
     maintain_expenses = calc_maintain_expenses(stripes_quantity)
     transport_expenses = calc_transport_expenses(cost_efficient)
@@ -696,9 +755,11 @@ def main():
     #
 
 
-    roads_upd = [('1', '2'), ('16', '17'), ('19', '18'), ('30', '29')]
+    # roads_upd = [('1', '2'), ('16', '17'), ('19', '18'), ('30', '29')]
+    bad_roads = find_bad_roads(road_classes_by_speeds)
+    assert len(bad_roads) >= 3, 'Bad roads is less than 3. Pay attention.'
 
-    stripes_quantity_upd = update_stripes(stripes_quantity, roads_upd)
+    stripes_quantity_upd = update_stripes(stripes_quantity, bad_roads)
 
     transport_streams_speed_upd, transport_intensity_upd = calculate_streams_speed(graph, stripes_quantity_upd, stripe_bandwidth, upd=True)
     cost_efficient_upd, lens_efficient_upd, time_efficient_upd = calculate_criteria_efficient(transport_intensity_upd, transportation_costs, time_movements, lens)
@@ -707,14 +768,14 @@ def main():
 
     maintain_expenses_upd = calc_maintain_expenses(stripes_quantity_upd, upd=True)
     transport_expenses_upd = calc_transport_expenses(cost_efficient_upd, upd=True)
-    capital_expense_upd = calc_capital_expense(roads_upd)
+    capital_expense_upd = calc_capital_expense(bad_roads)
     write_log('Formula (5.4)\n\nКапітальні витрати становлять: {}\n{}\n\n'.format(capital_expense_upd, '_'*50))
 
     maintain_expenses_upd, transport_expenses_upd, propose_total_expenses, coefs_kt = calculate_total_expenses(maintain_expenses_upd, transport_expenses_upd, capital_expense_upd, discount, upd=True)
 
     table5 = build_table5(coefs_kt, maintain_expenses, maintain_expenses_upd, transport_expenses, transport_expenses_upd, capital_expense_upd, base_total_expenses, propose_total_expenses)
 
-    table_upd = build_table_upd(roads_upd, lens, stripes_quantity_upd, transport_streams_speed_upd, transport_intensity_upd, coefs_overload_upd)
+    table_upd = build_table_upd(bad_roads, lens, stripes_quantity_upd, transport_streams_speed_upd, transport_intensity_upd, coefs_overload_upd)
 
     write2excel(mds, efficients, table_upd, table3, table5, user_name, filename)
 

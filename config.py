@@ -892,7 +892,7 @@ FLOWS = {
 
 STRIPES_QUANTITY = {
     '1': {
-        '2': 1      # edited from 2 to 1
+        '2': 2      # edited from 2 to 1
     },
     '10': {
         '11': 2, 
@@ -926,7 +926,7 @@ STRIPES_QUANTITY = {
         '20': 2
     },
     '16': {
-        '17': 1     # edited from 2 to 1
+        '17': 2     # edited from 2 to 1
     },
     '17': {
         '15': 2, 
@@ -941,7 +941,7 @@ STRIPES_QUANTITY = {
         '8': 2
     },
     '19': {
-        '18': 1     # edited from 2 to 1
+        '18': 2     # edited from 2 to 1
     },
     '2': {
         '1': 2, 
@@ -1007,7 +1007,7 @@ STRIPES_QUANTITY = {
         '8': 1
     },
     '30': {
-        '29': 1     # edited from 2 to 1
+        '29': 2     # edited from 2 to 1
     },
     '4': {
         '3': 1, 
@@ -1039,4 +1039,14 @@ STRIPES_QUANTITY = {
         '4': 2, 
         '8': 1
     }
+}
+
+
+ROAD_CLASS_PRIORITY = {
+    'A': 5,
+    'B': 4,
+    'C': 3,
+    'D': 2,
+    'E': 1,
+    'F': 0
 }
