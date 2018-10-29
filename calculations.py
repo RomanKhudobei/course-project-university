@@ -621,8 +621,7 @@ def write2excel(database, efficients, table_upd, table3, table5, user_name, file
     # building chart
     ws = build_chart(ws)
 
-    to_remove = wb.get_sheet_by_name('Sheet')
-    wb.remove_sheet(to_remove)
+    del wb['Sheet']
 
     wb.save(filename)
 
