@@ -3,8 +3,9 @@ import decimal
 from decimal import Decimal as D
 
 import config
-from utils import decimal_context_ROUND_UP_rule
+from utils import decimal_context_ROUND_UP_rule, decimal_context_ROUND_DOWN_rule
 from logger import Logger
+from transport import BUSES
 
 
 CONTEXT = decimal.getcontext()
@@ -16,16 +17,51 @@ logger = Logger()
 class Route(object):
     PASSENGER_FLOW_TO_BUS_CAPACITY = {
         (0, 300): (18, 30),
-        (301, 500): (30, 50),
-        (501, 1000): (50, 80),
-        (1001, 1800): (80, 100),
-        (1801, 2600): (100, 120),
-        (2601, 3800): (120, 160)
+        (300, 500): (30, 50),
+        (500, 1000): (50, 80),
+        (1000, 1800): (80, 100),
+        (1800, 2600): (100, 120),
+        (2600, 3800): (120, 160)
     }
+    conclusion_ordering = [
+        'Довжина маршруту',
+        'Середня довжина перегону',
+        'Кількість зупинок',
+        'Час простою на проміжній зупинці',
+        'Час простою на кінцевій зупинці',
+        'Технічна швидкість',
+        'Час рейсу розрахунковий',
+        'Час рейсу прийнятий',
+        'Час обороту',
+        'Максимальний пасажиропотік',
+        'Раціональна пасажиромісткість за інтервалом 4',
+        'Раціональна пасажиромісткість за інтервалом 8',
+        'Діапазон пасажиропотоку',
+        'Діапазон пасажиромісткості',
+        'Прийнята пасажиромісткість',
+        'Модель автобуса',
+        'Пасажиромісткість автобуса',
+        'Кількість сидячих місць',
+        'Гранична пасажиромісткість розрахункова',
+        'Гранична пасажиромісткість прийнята',
+        'Інтервал у годину пік розрахунковий',
+        'Інтервал у годину пік прийнятий',
+        'Кількість автобусів у годину пік розрахункова',
+        'Кількість автобусів у годину пік прийнята',
+        'Кількість перевезених пасажирів',
+        'Фактичний пасажирообіг',
+        'Середня довжина їздки пасажира',
+        'Коефіцієнт змінності пасажирів',
+        'Можливий пасажирообіг',
+        'Динамічний коефіцієнт використання пасажиромісткості',
+        'Коефіцієнт ефективності',
+        # '',
+        # 'Коефіцієнт непрямолінійності'
+    ]
 
     def __init__(self, path=[], graph=None, bus=None):
         # TODO: write setters/getters like in graph
-        self.__id = str(random.randint(0, 1000))
+        self.__id = str(random.randint(0, 500))    # TODO: add number property to identificate each route
         self.path = path
         self.__efficiency = D('0')
         self.graph = graph
@@ -35,6 +71,7 @@ class Route(object):
             'by_interval': {},
             'by_max_pass_flow': {}
         }
+        self.economical_stats = {}
 
     @property
     def arcs(self):
@@ -148,8 +185,8 @@ class Route(object):
     
         route_efficiency = round(top / bottom, 2)
         self.__efficiency = route_efficiency
+        self.economical_stats['Коефіцієнт ефективності'] = self.__efficiency
         efstr = f'kеф = {top} / {bottom} = {route_efficiency}'
-        # print(efstr)
         logger.set_room('6.3', logger.get_room('6.3').replace(f'$route_efficiency_placeholder_{self.__id}$', efstr + '\n'))
         return route_efficiency
 
@@ -193,7 +230,6 @@ class Route(object):
         rows.append(['Зворотній напрям'] + reverse)
         return rows
 
-
     @decimal_context_ROUND_UP_rule
     def rational_bus_capacity_by_interval(self, interval=8):
         max_pass_flow = max(self.__collect_values(self.passenger_flow))
@@ -201,6 +237,7 @@ class Route(object):
         bus_capacity = round(max_pass_flow * interval / 60, 0)
         logger.write_into('MAIN', f'\n(Для маршруту {self})\nqn = {max_pass_flow} * {interval} / 60 = {bus_capacity}\n')
 
+        self.economical_stats[f'Раціональна пасажиромісткість за інтервалом {interval}'] = bus_capacity
         self.rational_bus_capacity['by_interval'].update({interval: bus_capacity})
         return bus_capacity
 
@@ -213,6 +250,8 @@ class Route(object):
         for (min_pass_flow, max_pass_flow), (min_capacity, max_capacity) in self.PASSENGER_FLOW_TO_BUS_CAPACITY.items():
 
             if min_pass_flow <= max_route_pass_flow <= max_pass_flow:
+                self.economical_stats['Діапазон пасажиропотоку'] = f'{min_pass_flow}-{max_pass_flow}'
+                self.economical_stats['Діапазон пасажиромісткості'] = f'{min_capacity}-{max_capacity}'
                 bus_capacity = round(min_capacity + (
                         (max_route_pass_flow - min_pass_flow) * (max_capacity - min_capacity) / (max_pass_flow - min_pass_flow)
                 ), 0)
@@ -224,15 +263,198 @@ class Route(object):
         if bus_capacity is None:
             raise ValueError(f'Route passenger flow out of range ({max_route_pass_flow})')
 
+        self.economical_stats['Прийнята пасажиромісткість'] = bus_capacity
         self.rational_bus_capacity['by_max_pass_flow'].update({max_route_pass_flow: bus_capacity})
         return bus_capacity
 
-    def __calculate_length(self):
-        # TODO: modificate to make possible log values into log file
-        return len(self)
+    def choose_bus(self):
+        _, rational_bus_capacity = list(self.rational_bus_capacity['by_max_pass_flow'].items())[0]
+        chosen = None
+        closest = (999, None)   # difference, bus
 
-    def calculate_tech_and_economic_indicators(self):
-        pass
+        for bus in BUSES:
+            difference = abs(rational_bus_capacity - bus.capacity)
+            print(rational_bus_capacity, bus.capacity_limit)
+            if difference < closest[0] and rational_bus_capacity <= bus.capacity_limit:
+                closest = (difference, bus)
+
+        if closest[1] is not None:
+            chosen = closest[1]
+
+        if chosen is None:
+            raise ValueError('Couldn\'t choose bus from bus list')
+
+        self.bus = chosen
+        self.economical_stats['Модель автобуса'] = self.bus.name
+        self.economical_stats['Пасажиромісткість автобуса'] = self.bus.capacity
+        self.economical_stats['Кількість сидячих місць'] = self.bus.seats_count
+        # self.economical_stats['Гранична пасажиромісткість'] = self.bus.capacity_limit
+        logger.write_into('MAIN', f'- маршрут {self} - автобус {self.bus.name};\n')
+        return chosen
+
+    def __calculate_technical_speed(self):
+        return D('20') + config.LAST_CREDIT_DIGIT
+
+    def __calculate_intermediate_stop_await_time(self):
+        return D('30') + D('5') * config.LAST_CREDIT_DIGIT
+
+    def __calculate_last_stop_await_time(self):
+        return D('3') + config.LAST_CREDIT_DIGIT
+
+    def __calculate_line_length_average(self):
+        return round((D('400') + D('50') * config.LAST_CREDIT_DIGIT) / D('1000'), 2)
+
+    @decimal_context_ROUND_DOWN_rule
+    def __calculate_stops_count(self, line_length_average):
+        return round(self.length() / line_length_average + D('1'), 0)
+
+    @decimal_context_ROUND_UP_rule
+    def __calculate_one_way_trip_time(self, technical_speed, stops_count, last_stop_await_time, intermediate_stop_await_time):
+        return round((D('60') * self.length() / technical_speed) + (stops_count * intermediate_stop_await_time / D('60')) + last_stop_await_time, 2
+            )
+
+    def __calculate_round_trip_time(self, one_way_trip_time):
+        return D('2') * one_way_trip_time
+
+    @decimal_context_ROUND_DOWN_rule
+    def __calculate_bus_capacity_limit(self):
+        return round(((self.bus.capacity - self.bus.seats_count) / D('5')) * D('8') + self.bus.seats_count, 1)
+
+    @decimal_context_ROUND_DOWN_rule
+    def __calculate_rush_hour_interval(self, bus_capacity_limit, max_route_pass_flow):
+        return round((D('60') * bus_capacity_limit / max_route_pass_flow) + 1, 2)
+
+    @decimal_context_ROUND_UP_rule
+    def __calculate_rush_hour_bus_count(self, round_trip_time, rush_hour_interval):
+        return round(round_trip_time / rush_hour_interval, 2)
+
+    def __calculate_actual_passenger_flow(self):
+        return round(
+                sum(self.passenger_flow[i][j] * self.graph.graph[i][j]for i in self.passenger_flow for j in self.passenger_flow[i]),
+                1
+            )
+
+    def __count_passengers(self):
+        passengers_count = 0
+
+        for i in self.graph.results['redistributed_correspondences'].data:
+            for j in self.graph.results['redistributed_correspondences'].data[i]:
+                if i in self.path and j in self.path:
+                    passengers_count += self.graph.results['redistributed_correspondences'].data[i][j] + self.graph.results['missed_flows'].data.get(i, {}).get(j, 0)
+
+        return passengers_count
+
+    def __calculate_passenger_trip_average_length(self, actual_passenger_flow, passengers_count):
+        return round(actual_passenger_flow / passengers_count, 2)
+
+    def __calculate_possible_passenger_circulation(self, rush_hour_bus_count, round_trip_time):
+        return round(D('2') * D('60') * self.length() * rush_hour_bus_count * self.bus.capacity / round_trip_time, 0)
+
+    def __calculate_passengers_variation_coef(self, passenger_trip_average_length):
+        return round(self.length() / passenger_trip_average_length, 2)
+
+    def __calculate_capacity_usage_dynamic_factor(self, actual_passenger_flow, possible_passenger_circulation):
+        return round(actual_passenger_flow / possible_passenger_circulation, 2)
+
+    def economical_stats_table_keys(self):
+        # return ['_'.join(key.split()) for key in self.economical_stats.keys()]
+        return list(self.economical_stats.keys())
+
+    def economical_stats_table_part(self):
+        return [self.economical_stats[key] for key in self.conclusion_ordering]
+
+    def calculate_economical_stats(self, log=False):
+        if not self.graph:
+            raise AttributeError('Provide graph to calculate passenger flow of the route')
+
+        self.economical_stats['Довжина маршруту'] = self.length()
+        self.economical_stats['Технічна швидкість'] = technical_speed = self.__calculate_technical_speed()
+        self.economical_stats['Час простою на проміжній зупинці'] = intermediate_stop_await_time = self.__calculate_intermediate_stop_await_time()
+        self.economical_stats['Час простою на кінцевій зупинці'] = last_stop_await_time = self.__calculate_last_stop_await_time()
+        self.economical_stats['Середня довжина перегону'] = line_length_average = self.__calculate_line_length_average()
+        self.economical_stats['Кількість зупинок'] = stops_count = self.__calculate_stops_count(line_length_average)
+        self.economical_stats['Час рейсу розрахунковий'] = one_way_trip_time = self.__calculate_one_way_trip_time(technical_speed, stops_count, last_stop_await_time, intermediate_stop_await_time)
+        self.economical_stats['Час рейсу прийнятий'] = one_way_trip_time = decimal_context_ROUND_UP_rule(lambda: round(one_way_trip_time, 0))()
+        self.economical_stats['Час обороту'] = round_trip_time = self.__calculate_round_trip_time(one_way_trip_time)
+        self.economical_stats['Гранична пасажиромісткість розрахункова'] = bus_capacity_limit = self.__calculate_bus_capacity_limit()
+        self.economical_stats['Гранична пасажиромісткість прийнята'] = bus_capacity_limit = decimal_context_ROUND_DOWN_rule(lambda: round(bus_capacity_limit, 0))()
+
+        # assert bus_capacity_limit <= self.bus.capacity_limit, 'Bus capacity limit is exceeded'
+
+        self.economical_stats['Максимальний пасажиропотік'] = max_route_pass_flow = list(self.rational_bus_capacity['by_max_pass_flow'].keys())[0]
+        self.economical_stats['Інтервал у годину пік розрахунковий'] = rush_hour_interval = self.__calculate_rush_hour_interval(bus_capacity_limit, max_route_pass_flow)
+        self.economical_stats['Інтервал у годину пік прийнятий'] = rush_hour_interval = decimal_context_ROUND_DOWN_rule(lambda: round(rush_hour_interval, 0))()
+        self.economical_stats['Кількість автобусів у годину пік розрахункова'] = rush_hour_bus_count = self.__calculate_rush_hour_bus_count(round_trip_time, rush_hour_interval)
+        self.economical_stats['Кількість автобусів у годину пік прийнята'] = rush_hour_bus_count = decimal_context_ROUND_UP_rule(lambda: round(rush_hour_bus_count, 0))()
+        self.economical_stats['Фактичний пасажирообіг'] = actual_passenger_flow = self.__calculate_actual_passenger_flow()
+        self.economical_stats['Кількість перевезених пасажирів'] = passengers_count = self.__count_passengers()
+
+        assert '.' not in str(passengers_count), 'Passengers count has remainder'
+
+        self.economical_stats['Середня довжина їздки пасажира'] = passenger_trip_average_length = self.__calculate_passenger_trip_average_length(actual_passenger_flow, passengers_count)
+        self.economical_stats['Коефіцієнт змінності пасажирів'] = passengers_variation_coef = self.__calculate_passengers_variation_coef(passenger_trip_average_length)
+        self.economical_stats['Можливий пасажирообіг'] = possible_passenger_circulation = self.__calculate_possible_passenger_circulation(rush_hour_bus_count, round_trip_time)
+        self.economical_stats['Динамічний коефіцієнт використання пасажиромісткості'] = capacity_usage_dynamic_factor = self.__calculate_capacity_usage_dynamic_factor(actual_passenger_flow, possible_passenger_circulation)
+
+        if log:
+            logger.write_into('MAIN', f'\n--- РОЗРАХУНКИ ДЛЯ МАРШРУТУ {self} ---\n')
+
+            logger.write_into('MAIN', '\nФормула (8.1) Довжина маршруту\n')
+            logger.write_into('MAIN', f"Lm = {' + '.join(str(self.graph.graph[i][j]) for i, j in self.arcs)} = {self.length()}\n")
+
+            logger.write_into('MAIN', '\nФормула (8.4) Технічна швидкість руху автобусів\n')
+            logger.write_into('MAIN', f'Vm = 20 + {config.LAST_CREDIT_DIGIT} = {technical_speed}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.5) Час простою на проміжній зупинці\n')
+            logger.write_into('MAIN', f'tп.з. = 30 + 5 * {config.LAST_CREDIT_DIGIT} = {intermediate_stop_await_time}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.6) Час простою на кінцевій зупинці\n')
+            logger.write_into('MAIN', f'tк.з. = 3 + {config.LAST_CREDIT_DIGIT} = {last_stop_await_time}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.8) Середня довжина перегону на маршруті\n')
+            logger.write_into('MAIN', f'lпер = (400 + 50 * {config.LAST_CREDIT_DIGIT}) / 1000 = {line_length_average}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.7) Кількість зупинок на маршруті\n')
+            logger.write_into('MAIN', f'nзуп = {self.length()} / {line_length_average} + 1 = {stops_count}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.3) Час рейсу\n')
+            logger.write_into(
+                'MAIN',
+                f'tрейс = ' +
+                f'(60 * {self.length()} / {technical_speed}) + ' +
+                f'({stops_count} * {intermediate_stop_await_time} / 60) + ' +
+                f'1 = {one_way_trip_time}\n'
+            )
+
+            logger.write_into('MAIN', '\nФормула (8.2) Час обороту\n')
+            logger.write_into('MAIN', f'tоб = 2 * {one_way_trip_time} = {round_trip_time}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.10) Гранична пасажиромісткість автобуса\n')
+            logger.write_into('MAIN', f'qгран = (({self.bus.capacity} - {self.bus.seats_count}) / 5 ) * 8 + {self.bus.seats_count} = {bus_capacity_limit}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.9) Інтервал руху у годину пік\n')
+            logger.write_into('MAIN', f'Іпік = (60 * {bus_capacity_limit} / {max_route_pass_flow}) + 1 = {rush_hour_interval}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.11) Кількість автобусів на маршруті у годину пік\n')
+            logger.write_into('MAIN', f'Aпік = {round_trip_time} / {rush_hour_interval} = {rush_hour_bus_count}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.12) Фактичний пасажирообіг на маршруті\n')
+            logger.write_into('MAIN', f"Pф = {' + '.join(f'{self.passenger_flow[i][j]} * {self.graph.graph[i][j]}' for i in self.passenger_flow for j in self.passenger_flow[i])} = {actual_passenger_flow}\n")
+
+            logger.write_into('MAIN', '\nФормула (8.13) Кількість перевезених пасажирів на маршруті\n')
+            logger.write_into('MAIN', f"Q = {' + '.join([str(self.passenger_flow[i][j]) for i, j in self.arcs] + [str(self.passenger_flow[j][i]) for i, j in self.arcs])} = {passengers_count}\n")
+
+            logger.write_into('MAIN', '\nФормула (8.14) Середня довжина їздки одного пасажира на маршруті\n')
+            logger.write_into('MAIN', f'lсер = {actual_passenger_flow} / {passengers_count} = {passenger_trip_average_length}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.15) Коефіцієнт змінності пасажирів на маршруті\n')
+            logger.write_into('MAIN', f'nзм = {self.length()} / {passenger_trip_average_length} = {passengers_variation_coef}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.16) Можливий пасажирообіг на маршруті\n')
+            logger.write_into('MAIN', f'Рм = 2 * 60 * {self.length()} * {rush_hour_bus_count} * {self.bus.capacity} / {round_trip_time} = {possible_passenger_circulation}\n')
+
+            logger.write_into('MAIN', '\nФормула (8.17) Динамічний коефіцієнт використання пасажиромісткості\n')
+            logger.write_into('MAIN', f'yд = {actual_passenger_flow} / {possible_passenger_circulation} = {capacity_usage_dynamic_factor}\n')
 
     def __collect_values(self, d):
         # or just use [value for values in [d.values() for d in passenger_flows.values()] for value in list(values)]

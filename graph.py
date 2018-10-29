@@ -319,7 +319,7 @@ class Graph(object):
                       f'Прямий напрям: {straight_flow}; Зворотній напрям: {reverse_flow}'.replace('.', ','))
 
     def __calculate_transport_work_per_line(self, passenger_flows, lens):
-        transport_work_per_line = {'Перегони': [], 'Транспортна_робота': []}  # different structure for pandas
+        transport_work_per_line = {'Перегони': [], 'Транспортна робота': []}  # different structure for pandas
         restrict_log = len(config.RESTRICT_LOG)
 
         for i in passenger_flows:
@@ -330,13 +330,13 @@ class Graph(object):
 
                 result = round((passenger_flows[i][j] + passenger_flows[j][i]) * lens[i][j], 1)
                 transport_work_per_line['Перегони'].append(f'{i}-{j}')
-                transport_work_per_line['Транспортна_робота'].append(str(result))
+                transport_work_per_line['Транспортна робота'].append(str(result))
 
                 if restrict_log != 0:
                     logger.write_into('MAIN', f'P{i}-{j} = ({passenger_flows[i][j]} + {passenger_flows[j][i]}) * {lens[i][j]} = {result}\n')
                     restrict_log -= 1
 
-        logger.write_into('MAIN', f"\nФормула (4.3) Сума транспортних робіт\nPзаг = {' + '.join(transport_work_per_line['Транспортна_робота'])} = {sum(float(value) for value in transport_work_per_line['Транспортна_робота'])}\n")
+        logger.write_into('MAIN', f"\nФормула (4.3) Сума транспортних робіт\nPзаг = {' + '.join(transport_work_per_line['Транспортна робота'])} = {sum(float(value) for value in transport_work_per_line['Транспортна робота'])}\n")
         return Result('pandas', 'Таблиця 4.1', transport_work_per_line)
 
     @decimal_context_ROUND_UP_rule
@@ -386,9 +386,9 @@ class Graph(object):
                         logger.write_into('6.2', f'H*{i}-{j} = {correspondences[i][j]} / {connections[i][j]} = {result}\n')
 
                 except ZeroDivisionError:
-                    redistributed_correspondences[i][j] = ''
+                    redistributed_correspondences[i][j] = D('0')
                 except KeyError:
-                    redistributed_correspondences[i][j] = ''
+                    redistributed_correspondences[i][j] = D('0')
 
         return Result('10x10', 'Перерозподілені кореспонденції', redistributed_correspondences)
 
@@ -409,7 +409,7 @@ class Graph(object):
 
         count_connections = self.__count_connections(connections.data)
 
-        # self.__calculate_efficiency_on_routes(self.__routes)
+        # 6.3
         self.__calculate_passenger_flows_on_routes(self.__routes)
 
         if (count_connections[0] >= D('20') or any(map(lambda route: route.efficiency() < 0.6, self.__routes.values()))) and self.auto_build_routes:    # TODO: get this values from command line
@@ -613,7 +613,7 @@ class Graph(object):
 
         return Result('12x12', 'Неврахований потік', missed_flows)
 
-    def __accumulate_table_6_15(self, routes):
+    def __generate_table_6_15(self, routes):
         table = []
         for route in routes: table += route.missed_flow_table_part()
         return table
@@ -639,12 +639,49 @@ class Graph(object):
         for route in routes:
             route.rational_bus_capacity_by_passenger_flow()
 
+    def __choose_buses_on_routes(self, routes):
+        for route in routes:
+            route.choose_bus()
+
+    def __calculate_economical_stats_on_routes(self, routes):
+        for index, route in enumerate(routes):
+            route.calculate_economical_stats(log=(index == 0))
+
+    def __generate_economical_stats_table(self, routes):
+        table = {}
+
+        for index, (route_num, route_obj) in enumerate(routes.items()):
+
+            if index == 0:
+                table.update({'ТЕП': route_obj.conclusion_ordering})
+
+            table.update({f'Маршрут №{route_num}': route_obj.economical_stats_table_part()})
+
+        return table
+
+    def __calculate_network_quality_coef(self, routes, min_transport_work):
+        network_quality_coef = D('0')
+        between = []
+
+        for route in routes:
+            between.append(route.economical_stats['Фактичний пасажирообіг'])
+
+        result = round(sum(between) / min_transport_work, 2)
+        logger.write_into('MAIN', f"Кя = {' + '.join(str(value) for value in between)} / {min_transport_work} = {result}\n")
+        return result
+
     def calculate(self, create_xls=True):
+        #
+        # CHAPTER 1
+        #
         logger.write_into('MAIN', 'Формула (1.1) Найкоротші відстані та шляхи\n', create_if_not_exist=True)
         lens, paths = self.__calculate_lens_and_paths()
         self.results.update({'lens': lens})
         self.results.update({'paths': paths})
 
+        #
+        # CHAPTER 2
+        #
         logger.write_into('MAIN', '\nФормула (2.3) Проміжна матриця і Трудність сполучення\n')
         Dij, Cij = self.__calculate_Dij_and_Cij(lens.data, self.flows)
 
@@ -659,19 +696,19 @@ class Graph(object):
 
         # Таблиця 2.4
         table = {
-            'Номер_ТР': [int(node) for node in self.NODES],
-            'HOi_дане': [int(self.flows[n]['creation']) for n in self.NODES],
-            'HOi_пораховане': [int(self.__calculate_matrix_row(i, correspondences.data)) for i in self.NODES]
+            'Номер ТР': [int(node) for node in self.NODES],
+            'HOi дане': [int(self.flows[n]['creation']) for n in self.NODES],
+            'HOi пораховане': [int(self.__calculate_matrix_row(i, correspondences.data)) for i in self.NODES]
         }
-        self.results.update({'Таблиця 2.4': Result('pandas', 'Таблиця 2.4', table, transpose=True, convert_to_int=True)})
+        self.results.update({'Таблиця 2.4': Result('pandas', 'Таблиця 2.4', table, transpose=True)})
 
         # Таблиця 2.5
         table = {
-            'Номер_ТР': [int(node) for node in self.NODES],
-            'HPj_дане': [int(self.flows[n]['absorption']) for n in self.NODES],
-            'HPj_пораховане': [int(self.__calculate_matrix_column(j, correspondences.data)) for j in self.NODES]
+            'Номер ТР': [int(node) for node in self.NODES],
+            'HPj дане': [int(self.flows[n]['absorption']) for n in self.NODES],
+            'HPj пораховане': [int(self.__calculate_matrix_column(j, correspondences.data)) for j in self.NODES]
         }
-        self.results.update({'Таблиця 2.5': Result('pandas', 'Таблиця 2.5', table, transpose=True, convert_to_int=True)})
+        self.results.update({'Таблиця 2.5': Result('pandas', 'Таблиця 2.5', table, transpose=True)})
 
         logger.write_into('MAIN', '\nФормула (2.10) (2.11)\n')
         before_delta_j, correction_coefs = self.__calculate_delta_j_and_correction_coefs(self.flows, correspondences.data)
@@ -686,12 +723,18 @@ class Graph(object):
         after_delta_j = self.__calculate_delta_j_and_correction_coefs(self.flows, corrected_correspondences.data, calc_correction_coefs=False)
         self.results.update({'after_delta_j': after_delta_j})
 
+        #
+        # CHAPTER 3
+        #
         logger.write_into('MAIN', '\nФормула (3.2) Мінімальна транспортна робота\n')
         transport_work = self.__calculate_transport_work(corrected_correspondences.data, lens.data)
         min_transport_work = self.__calculate_min_transport_work(transport_work.data)
         self.results.update({'transport_work': transport_work})
         # self.results.update({'min_transport_work': min_transport_work})
 
+        #
+        # CHAPTER 4
+        #
         logger.write_into('MAIN', '\nФормула (4.1) Пасажиропотік\n')
         passenger_flows = self.__calculate_passenger_flows(paths.data, corrected_correspondences.data)
         self.results.update({'passenger_flows': passenger_flows})
@@ -703,6 +746,9 @@ class Graph(object):
         transport_work_per_line = self.__calculate_transport_work_per_line(passenger_flows.data, lens.data)
         self.results.update({'Таблиця 4.1': transport_work_per_line})
 
+        #
+        # CHAPTER 5
+        #
         logger.write_into('MAIN', '\nФормула (5.1)\n')
         recommendations = self.__make_recommendations(passenger_flows.data)
         self.results.update({'recommendations': recommendations})
@@ -711,12 +757,11 @@ class Graph(object):
         print('count_connections (how many zeros)', count_connections)
         network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))
         print('Network efficiency', network_efficiency)
-        # TODO: add summary table with routes efficiencies
 
         # Таблиця 5.5
         table = {
             'Маршрут': [str(route) for route in self.__routes.values()],
-            'Довжина_маршруту': [route.length() for route in self.__routes.values()]
+            'Довжина маршруту': [route.length() for route in self.__routes.values()]
         }
         self.results.update({'Таблиця 5.5': Result('pandas', 'Таблиця 5.5', table)})
 
@@ -733,10 +778,14 @@ class Graph(object):
         transplantation_rate = self.__calculate_transplantation_rate(self.results['connections'].data, corrected_correspondences.data)
         print('transplantation_rate', transplantation_rate)
 
+        #
+        # CHAPTER 6
+        #
+        # from __build_network
         logger.merge_rooms('MAIN', ['6.2', '6.3'])
 
         # Таблиця 6.14
-        data = {'Маршрут': range(1, len(self.__routes)+1), 'Коефіцієнт_ефективності': [route.efficiency() for route in self.__routes.values()]}
+        data = {'Маршрут': range(1, len(self.__routes)+1), 'Коефіцієнт ефективності': [route.efficiency() for route in self.__routes.values()]}
         self.results.update({'Таблиця 6.14': Result('pandas', 'Таблиця 6.14', data, transpose=True)})
 
         logger.write_into('MAIN', '\nРайони, які між собою не з\'єднані жодним маршрутом\n')
@@ -753,6 +802,7 @@ class Graph(object):
         logger.write_into('MAIN', f'Сформовані маршрути не враховують {total_missed_flow} пасажирів\n')
         print('missed_flows', total_missed_flow)
 
+        # 6.3
         self.__calculate_passenger_flows_on_routes(self.__routes, missed_flows=missed_flows.data)
         self.__calculate_efficiency_on_routes(self.__routes, force=True)
 
@@ -765,7 +815,7 @@ class Graph(object):
         # TODO: maybe write docx auto generation in further
 
         # Таблиця 6.15
-        self.results.update({'Таблиця 6.15': Result('rows', 'Таблиця 6.15', self.__accumulate_table_6_15(self.__routes.values()))})
+        self.results.update({'Таблиця 6.15': Result('rows', 'Таблиця 6.15', self.__generate_table_6_15(self.__routes.values()))})
 
         for route_num, route_obj in self.__routes.items():
             self.results.update({
@@ -778,8 +828,9 @@ class Graph(object):
             })
 
         # Таблиця 6.28
-        data.update({'Коефіцієнт_ефективності_до_дозавантаження_маршрутів': data.pop('Коефіцієнт_ефективності')})
-        data.update({'Коефіцієнт_ефективності_після_дозавантаження_маршрутів': [route.efficiency() for route in self.__routes.values()]})
+        data = deepcopy(data)
+        data.update({'Коефіцієнт ефективності до дозавантаження маршрутів': data.pop('Коефіцієнт ефективності')})
+        data.update({'Коефіцієнт ефективності після дозавантаження маршрутів': [route.efficiency() for route in self.__routes.values()]})
         self.results.update({'Таблиця 6.28': Result('pandas', 'Таблиця 6.28', data, transpose=True)})
 
         logger.write_into('MAIN', f'\nФормула (7.1) Раціональна номінальна пасажиромісткість автобуса виходячи з доцільного інтерувалу руху\n')
@@ -792,17 +843,32 @@ class Graph(object):
                                     'номінальної пасажиромісткості автобусів для інтервалу руху I = 8 хв.\n')
         self.__calculate_rational_bus_capacity_by_interval_on_routes(self.__routes.values(), interval=8)
 
+        #
+        # CHAPTER 7
+        #
         # Таблиця 7.1
         data = {
             'Маршрути': range(1, len(self.__routes)+1),
-            'Пасажиромісткість_при_інтервалі_4': [route.rational_bus_capacity['by_interval'][4] for route in self.__routes.values()],
-            'Пасажиромісткість_при_інтервалі_8': [route.rational_bus_capacity['by_interval'][8] for route in self.__routes.values()]
+            'Пасажиромісткість при інтервалі 4': [route.rational_bus_capacity['by_interval'][4] for route in self.__routes.values()],
+            'Пасажиромісткість при інтервалі 8': [route.rational_bus_capacity['by_interval'][8] for route in self.__routes.values()]
         }
         self.results.update({'Таблиця 7.1': Result('pandas', 'Таблиця 7.1', data, transpose=True)})
 
         logger.write_into('MAIN', f'\nФормула (7.2) Залежність місткості автобуса від потужності пасажиропотоку\n')
         self.__calculate_rational_bus_capacity_by_passenger_flow(self.__routes.values())
 
+        logger.write_into('MAIN', '\nЗгідно з отриманим результатом місткості\n' +
+                                   'для кожного маршруту призначаємо наступні моделі автобусів:\n')
+        self.__choose_buses_on_routes(self.__routes.values())
+
+        #
+        # CHAPTER 8
+        #
+        self.__calculate_economical_stats_on_routes(self.__routes.values())
+        self.results.update({'Таблиця 8.1': Result('pandas', 'ТЕП (Таблиця 8.1)', self.__generate_economical_stats_table(self.__routes))})
+
+        logger.write_into('MAIN', f'\nФормула (8.18) Коефіцієнт якості сформованої маршрутної мережі\n')
+        self.__calculate_network_quality_coef(self.__routes.values(), min_transport_work.data)
 
     # helper functions
 

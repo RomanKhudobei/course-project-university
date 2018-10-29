@@ -271,15 +271,14 @@ class ExcelResultsWriter(object):
         if kwargs.get('transpose'):
             table = table.T
 
-        rows = list(row.split() for row in table.to_string().split('\n'))
+
+        rows = list(row.split(';') for row in table.to_csv(sep=';').split('\n'))
 
         if kwargs.get('transpose'):
             rows[0] = [''] + rows[0]    # add column offset to column indexes (compensate row indexes)
 
         for row in rows:
-
-            if kwargs.get('convert_to_int'):
-                row = [int(value) if value.isdigit() else value for value in row]
+            row = [int(value) if value.isdigit() else value for value in row if value]
 
             ws.append(row)
 
