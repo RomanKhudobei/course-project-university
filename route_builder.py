@@ -1,8 +1,10 @@
 import random
 import decimal
+from copy import deepcopy
 from decimal import Decimal as D
 
 import config
+from result import Result
 from utils import decimal_context_ROUND_UP_rule, decimal_context_ROUND_DOWN_rule
 from logger import Logger
 from transport import BUSES
@@ -72,6 +74,9 @@ class Route(object):
             'by_max_pass_flow': {}
         }
         self.economical_stats = {}
+        self.passenger_flow_by_hours = {}
+        self.max_passenger_flow = None
+        self.unevenness_coefs_by_hours = None
 
     @property
     def arcs(self):
@@ -265,6 +270,7 @@ class Route(object):
 
         self.economical_stats['Прийнята пасажиромісткість'] = bus_capacity
         self.rational_bus_capacity['by_max_pass_flow'].update({max_route_pass_flow: bus_capacity})
+        self.max_passenger_flow = max_route_pass_flow
         return bus_capacity
 
     def choose_bus(self):
@@ -274,7 +280,7 @@ class Route(object):
 
         for bus in BUSES:
             difference = abs(rational_bus_capacity - bus.capacity)
-            print(rational_bus_capacity, bus.capacity_limit)
+            # print(rational_bus_capacity, bus.capacity_limit)
             if difference < closest[0] and rational_bus_capacity <= bus.capacity_limit:
                 closest = (difference, bus)
 
@@ -381,7 +387,7 @@ class Route(object):
 
         # assert bus_capacity_limit <= self.bus.capacity_limit, 'Bus capacity limit is exceeded'
 
-        self.economical_stats['Максимальний пасажиропотік'] = max_route_pass_flow = list(self.rational_bus_capacity['by_max_pass_flow'].keys())[0]
+        self.economical_stats['Максимальний пасажиропотік'] = max_route_pass_flow = self.max_passenger_flow
         self.economical_stats['Інтервал у годину пік розрахунковий'] = rush_hour_interval = self.__calculate_rush_hour_interval(bus_capacity_limit, max_route_pass_flow)
         self.economical_stats['Інтервал у годину пік прийнятий'] = rush_hour_interval = decimal_context_ROUND_DOWN_rule(lambda: round(rush_hour_interval, 0))()
         self.economical_stats['Кількість автобусів у годину пік розрахункова'] = rush_hour_bus_count = self.__calculate_rush_hour_bus_count(round_trip_time, rush_hour_interval)
@@ -455,6 +461,201 @@ class Route(object):
 
             logger.write_into('MAIN', '\nФормула (8.17) Динамічний коефіцієнт використання пасажиромісткості\n')
             logger.write_into('MAIN', f'yд = {actual_passenger_flow} / {possible_passenger_circulation} = {capacity_usage_dynamic_factor}\n')
+
+    def __calculate_unevenness_coefs_by_hours(self):
+        unevenness_coefs_by_hours = {}
+
+        for index, (hour, unevenness_coef) in enumerate(config.UNEVENNESS_COEFS_BY_HOURS.items()):
+            result = round(unevenness_coef + D('0.01') * config.LAST_CREDIT_DIGIT + D('0.01') * config.BEFORE_LAST_CREDIT_DIGIT, 2)
+            result = result if result <= D('1') else D('1')
+            unevenness_coefs_by_hours.update({hour: result})
+
+            if index == 0:
+                logger.write_into('MAIN', f'k{hour} = {unevenness_coef} + 0.01 * {config.LAST_CREDIT_DIGIT} + 0.01 * {config.BEFORE_LAST_CREDIT_DIGIT} = {result}\n')
+
+        self.unevenness_coefs_by_hours = unevenness_coefs_by_hours
+        return unevenness_coefs_by_hours
+
+    def __calculate_passenger_flow_by_hours(self):
+        if not self.unevenness_coefs_by_hours:
+            raise ValueError('calculate_unevenness_coefs_by_hours must be called first')
+
+        passenger_flow_by_hours = {}
+
+        for index, (hour, unevenness_coef) in enumerate(self.unevenness_coefs_by_hours.items()):
+            result = round(self.max_passenger_flow * unevenness_coef, 0)
+            passenger_flow_by_hours.update({hour: result})
+
+            if index in [0, 1]:
+                logger.write_into('MAIN', f'k{hour} = {self.max_passenger_flow} * {unevenness_coef} = {result}\n')
+
+        return passenger_flow_by_hours
+
+    def __calculate_bus_count_by_hours(self, passenger_flow_by_hours, round_trip_time, bus_capacity):
+        bus_count_by_hours = {}
+
+        for index, (hour, passenger_flow) in enumerate(passenger_flow_by_hours.items()):
+            result = decimal_context_ROUND_UP_rule(lambda: round((passenger_flow * round_trip_time) / (bus_capacity * D('60')), 0))()
+            bus_count_by_hours[hour] = result
+
+            if index == 0:
+                logger.write_into('MAIN', f'A{hour} = {passenger_flow} * {round_trip_time} / {bus_capacity} * 60 = {result}\n')
+
+        return bus_count_by_hours
+
+    def __calculate_bus_deficit_coef(self):
+        result = round(D('0.8') + D('0.01') * config.LAST_CREDIT_DIGIT, 2)
+        logger.write_into('MAIN', f'kдеф = 0.8 + 0.01 * {config.LAST_CREDIT_DIGIT} = {result}\n')
+        return result
+
+    @decimal_context_ROUND_DOWN_rule
+    def __calculate_max_bus_working_count(self, bus_count_by_hours, bus_deficit_coef):
+        max_bus_count_by_hours = max(bus_count_by_hours.values())
+        result = round(max_bus_count_by_hours * bus_deficit_coef, 0)
+        logger.write_into('MAIN', f'Amax = {max_bus_count_by_hours} * {bus_deficit_coef} = {result}\n')
+        return result
+
+    def __calculate_max_interval(self):
+        result = D('12') + config.LAST_CREDIT_DIGIT
+        logger.write_into('MAIN', f'Imax = 12 + {config.LAST_CREDIT_DIGIT} = {result}\n')
+        return result
+
+    @decimal_context_ROUND_UP_rule
+    def __calculate_min_bus_working_count(self, round_trip_time, max_interval):
+        result = round(round_trip_time / max_interval, 0)
+        logger.write_into('MAIN', f'Amin = {round_trip_time} / {max_interval} = {result}\n')
+        return result
+
+    def __filter_bus_count_by_hours(self, bus_count_by_hours, max_bus_working_count, min_bus_working_count):
+
+        for hour, bus_count in bus_count_by_hours.items():
+            bus_count = bus_count if bus_count <= max_bus_working_count else max_bus_working_count
+            bus_count = bus_count if bus_count >= min_bus_working_count else min_bus_working_count
+            bus_count_by_hours.update({hour: bus_count})
+
+        return bus_count_by_hours
+
+    def __calculate_work_time(self):
+        work_time = D('8') if config.LAST_CREDIT_DIGIT % 2 == 0 else D('7')
+        logger.write_into('MAIN', f'Tзм = {work_time}\n')
+        return work_time
+
+    def __calculate_car_hours(self, bus_count_by_hours):
+        car_hours = sum(bus_count_by_hours.values())
+        logger.write_into('MAIN', f'АГ = {car_hours}\n')
+        return car_hours
+
+    def __calculate_empty_roads_length(self):
+        empty_roads_length = D('10') + D('2') * config.LAST_CREDIT_DIGIT
+        logger.write_into('MAIN', f'lo = 10 + 2 * {config.LAST_CREDIT_DIGIT} = {empty_roads_length}\n')
+        return empty_roads_length
+
+    def __calculate_empty_roads_time(self, empty_roads_length, technical_speed):
+        empty_roads_time = round(empty_roads_length / technical_speed, 1)
+        logger.write_into('MAIN', f'To = {empty_roads_length} / {technical_speed} = {empty_roads_time}\n')
+        return empty_roads_time
+
+    @decimal_context_ROUND_DOWN_rule
+    def __calculate_shifts_count(self, car_hours, empty_roads_time, max_bus_working_count, work_time):
+        shifts_count = round((car_hours + empty_roads_time * max_bus_working_count) / work_time, 2)
+        # TODO: Add rounding logging like this
+        logger.write_into('MAIN', f'ЗМ = ({car_hours} + {empty_roads_time} * {max_bus_working_count}) / {work_time} = {shifts_count} ~ {round(shifts_count, 0)}\n')
+        return round(shifts_count, 0)
+
+    def __calculate_exit_coef(self, shifts_count, max_bus_working_count):
+        exit_coef = shifts_count - D('2') * max_bus_working_count
+        assert '.' not in str(exit_coef)
+        logger.write_into('MAIN', f'kвих = {shifts_count} - 2 * {max_bus_working_count} = {exit_coef}\n')
+        return exit_coef
+
+    def __calculate_one_shift_mode_count(self, max_bus_working_count, car_hours):
+        one_shift_mode_count = D('2') * max_bus_working_count - car_hours
+        assert '.' not in str(one_shift_mode_count)
+        logger.write_into('MAIN', f'2 * {max_bus_working_count} - {car_hours} = {one_shift_mode_count}\n')
+        return one_shift_mode_count
+
+    def __calculate_two_shift_mode_count(self, max_bus_working_count, car_hours):
+        two_shift_mode_count = car_hours - max_bus_working_count
+        logger.write_into('MAIN', f'{car_hours} - {max_bus_working_count} = {two_shift_mode_count}\n')
+        return two_shift_mode_count
+
+    def calculate_bus_work_modes(self):
+        results = []
+        logger.write_into('MAIN', '\nФормула (9.2) Коефіцієнт нерівномірності пасажиропотоку протягом годин доби\n')
+        unevenness_coefs_by_hours = self.__calculate_unevenness_coefs_by_hours()
+
+        table = {
+            'Година доби': config.HOURS,
+            'Коефіцієнт нерівномірності': list(config.UNEVENNESS_COEFS_BY_HOURS.values())
+        }
+        results.append(Result('pandas', 'Таблиця 9.1', table, transpose=True))
+
+        table = deepcopy(table)
+        table.update({'Коефіцієнт нерівномірності': list(unevenness_coefs_by_hours.values())})
+        results.append(Result('pandas', 'Таблиця 9.2', table, transpose=True))
+
+        logger.write_into('MAIN', f'\nФормула (9.1) Пасажиропотік на маршруті за годинами доби\n')
+        passenger_flow_by_hours = self.__calculate_passenger_flow_by_hours()
+
+        table = {
+            'Година доби': config.HOURS,
+            'Пасажиропотік': list(passenger_flow_by_hours.values())
+        }
+        results.append(Result('pandas', 'Таблиця 9.3', table, transpose=True, chart_config={'type': 'column', 'x_title': 'Години доби', 'y_title': 'Пасажиропотік'}))
+
+        logger.write_into('MAIN', '\nФормула (9.3) Необхідна кількість автобусів за годиною доби\n')
+        bus_count_by_hours = self.__calculate_bus_count_by_hours(passenger_flow_by_hours, self.economical_stats['Час обороту'], self.bus.capacity)
+
+        table = {
+            'Година доби': config.HOURS,
+            'Необхідна кількість автобусів': list(bus_count_by_hours.values())
+        }
+        results.append(Result('pandas', 'Таблиця 9.4', table, transpose=True, chart_config={'type': 'column', 'x_title': 'Години доби', 'y_title': 'Кількість автобусів'}))
+
+        logger.write_into('MAIN', '\nФормула (9.5) Коефіцієнт дефіциту автобусів\n')
+        bus_deficit_coef = self.__calculate_bus_deficit_coef()
+
+        logger.write_into('MAIN', '\nФормула (9.4) Максимальна кількість працюючих автобусів\n')
+        max_bus_working_count = self.__calculate_max_bus_working_count(bus_count_by_hours, bus_deficit_coef)
+
+        logger.write_into('MAIN', '\nФормула (9.7) Максимально допустимий інтервал руху автобусів\n')
+        max_interval = self.__calculate_max_interval()
+
+        logger.write_into('MAIN', '\nФормула (9.6) Мінімальна кількість працюючих автобусів\n')
+        min_bus_working_count = self.__calculate_min_bus_working_count(self.economical_stats['Час обороту'], max_interval)
+
+        accepted_bus_count_by_hours = self.__filter_bus_count_by_hours(bus_count_by_hours, max_bus_working_count, min_bus_working_count)
+        table = {
+            'Година доби': config.HOURS,
+            'Прийнята кількість автобусів': list(accepted_bus_count_by_hours.values())
+        }
+        results.append(Result('pandas', 'Таблиця 9.5', table, transpose=True, chart_config={'type': 'column', 'x_title': 'Години доби', 'y_title': 'Кількість автобусів'}))
+
+        logger.write_into('MAIN', '\nФормула (9.10) Час зміни\n')
+        work_time = self.__calculate_work_time()
+
+        logger.write_into('MAIN', '\nФормула (9.9) Кількість автомобіле-годин\n')
+        car_hours = self.__calculate_car_hours(accepted_bus_count_by_hours)
+
+        logger.write_into('MAIN', '\nФормула (9.12) Довжина нульових пробігів\n')
+        empty_roads_length = self.__calculate_empty_roads_length()
+
+        logger.write_into('MAIN', '\nФормула (9.11) Час нульових пробігів\n')
+        empty_roads_time = self.__calculate_empty_roads_time(empty_roads_length, self.economical_stats['Технічна швидкість'])
+
+        logger.write_into('MAIN', '\nФормула (9.8) Визначення змінності роботи автобусів\n')
+        shifts_count = self.__calculate_shifts_count(car_hours, empty_roads_time, max_bus_working_count, work_time)
+
+        logger.write_into('MAIN', '\nФормула (9.13) Розподіл робочих змін автобусних бригад (Коефіцієнт виходу)\n')
+        exit_coef = self.__calculate_exit_coef(shifts_count, max_bus_working_count)
+
+        logger.write_into('MAIN', '\nФормула (9.14) Кількість змін в однозмінному режимі\n')
+        one_shift_mode_count = self.__calculate_one_shift_mode_count(max_bus_working_count, shifts_count)
+
+        logger.write_into('MAIN', '\nФормула (9.15) Кількість змін в двозмінному режимі\n')
+        two_shift_mode_count = self.__calculate_two_shift_mode_count(max_bus_working_count, shifts_count)
+
+        return results
 
     def __collect_values(self, d):
         # or just use [value for values in [d.values() for d in passenger_flows.values()] for value in list(values)]

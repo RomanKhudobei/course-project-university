@@ -271,7 +271,6 @@ class ExcelResultsWriter(object):
         if kwargs.get('transpose'):
             table = table.T
 
-
         rows = list(row.split(';') for row in table.to_csv(sep=';').split('\n'))
 
         if kwargs.get('transpose'):
@@ -281,6 +280,32 @@ class ExcelResultsWriter(object):
             row = [int(value) if value.isdigit() else value for value in row if value]
 
             ws.append(row)
+
+        if kwargs.get('chart_config'):
+            chart_types = {
+                'column': BarChart,
+                'line': ScatterChart
+            }
+            chart_config = kwargs.get('chart_config')
+            chart = chart_types[chart_config['type']]()
+            chart.style = 10
+            chart.title = name
+            chart.y_axis.title = chart_config['y_title']
+            chart.x_axis.title = chart_config['x_title']
+
+            xvalues = Reference(ws, min_col=1, min_row=3, max_col=len(rows[0])+1, max_row=3)  # x axis labels
+            values1 = Reference(ws, min_col=1, min_row=4, max_col=len(rows[0])+1, max_row=len(rows)+1)  # data for chart
+            s1 = Series(values1, xvalues, title_from_data=True)
+            chart.series.append(s1)
+
+            # cats = Reference(ws, min_col=1, min_row=3, max_col=len(rows[0]), max_row=3)
+            # data = Reference(ws, min_col=1, min_row=4, max_col=len(rows[0]), max_row=len(rows))
+            #
+            # chart.add_data(data)
+            # chart.set_categories(cats)
+
+            chart.shape = 4
+            ws.add_chart(chart, f'A{len(rows)+2}')
 
     def __write_single(self, ws, name, data):
         ws.cell(row=1, column=1, value=name)

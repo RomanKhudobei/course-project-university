@@ -870,6 +870,11 @@ class Graph(object):
         logger.write_into('MAIN', f'\nФормула (8.18) Коефіцієнт якості сформованої маршрутної мережі\n')
         self.__calculate_network_quality_coef(self.__routes.values(), min_transport_work.data)
 
+        #
+        # CHAPTER 9
+        #
+        [self.results.update({result.title: result}) for result in self.__routes['1'].calculate_bus_work_modes()]
+
     # helper functions
 
     def __calculate_matrix_column(self, j, matrix):
