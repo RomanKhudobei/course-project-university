@@ -26,3 +26,17 @@ def decimal_context_ROUND_DOWN_rule(func):
         return result
 
     return wrap
+
+def prepare_data(data):
+    prepared = {}
+
+    for i in data:
+
+        if type(data.get(i)) is not dict:
+            raise ValueError('Invalid input data')
+
+        for j in data[i]:
+            prepared.setdefault(j, [])
+            prepared[j].append(data[i][j])
+
+    return prepared

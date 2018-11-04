@@ -11,7 +11,7 @@ from pprint import pprint
 import config
 from result import Result
 from route_builder import RouteNetworkBuilder, Route
-from logger import Logger   #, prepare_log
+from logger import Logger
 from utils import decimal_context_ROUND_UP_rule
 
 

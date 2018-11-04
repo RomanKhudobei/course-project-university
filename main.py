@@ -1,6 +1,6 @@
 import config
 from graph import Graph
-from result import ExcelResultsWriter
+from result import ExcelResultsWriter, XlsxResultsWriter
 from logger import Logger
 
 
@@ -10,7 +10,8 @@ if __name__ == '__main__':
     # graph = Graph(config.MY_GRAPH, config.MY_FLOWS, auto_build_routes=True)
     graph.calculate()
 
-    writer = ExcelResultsWriter(graph.results)
-    writer.write2excel('test.xlsx')
+    # writer = ExcelResultsWriter(graph.results)
+    writer = XlsxResultsWriter(graph.results)
+    writer.write2excel('test2.xlsx')
 
     Logger().save('MAIN')

@@ -4,6 +4,8 @@ from openpyxl.styles import Font, Border, Side
 from openpyxl.chart import LineChart, Reference, BarChart, ScatterChart, Series
 import xlsxwriter as xls    # TODO: Rewrite in xlsxwriter
 
+from utils import prepare_data
+
 
 class Result(object):
     RESULT_TYPES = ('12x12', '10x10', '1x10', 'route', 'single', 'pandas', 'rows')
@@ -293,16 +295,16 @@ class ExcelResultsWriter(object):
             chart.y_axis.title = chart_config['y_title']
             chart.x_axis.title = chart_config['x_title']
 
-            xvalues = Reference(ws, min_col=1, min_row=3, max_col=len(rows[0])+1, max_row=3)  # x axis labels
-            values1 = Reference(ws, min_col=1, min_row=4, max_col=len(rows[0])+1, max_row=len(rows)+1)  # data for chart
-            s1 = Series(values1, xvalues, title_from_data=True)
-            chart.series.append(s1)
+            # xvalues = Reference(ws, min_col=2, min_row=3, max_col=20, max_row=3)  # x axis labels
+            # values1 = Reference(ws, min_col=1, min_row=4, max_col=20, max_row=4)  # data for chart
+            # s1 = Series(values1, xvalues, title_from_data=True)
+            # chart.series.append(s1)
 
-            # cats = Reference(ws, min_col=1, min_row=3, max_col=len(rows[0]), max_row=3)
-            # data = Reference(ws, min_col=1, min_row=4, max_col=len(rows[0]), max_row=len(rows))
-            #
-            # chart.add_data(data)
-            # chart.set_categories(cats)
+            cats = Reference(ws, min_col=1, min_row=3, max_col=len(rows[0])-1, max_row=3)
+            data = Reference(ws, min_col=1, min_row=4, max_col=len(rows[0])-1, max_row=len(rows))
+            
+            chart.add_data(data)
+            chart.set_categories(cats)
 
             chart.shape = 4
             ws.add_chart(chart, f'A{len(rows)+2}')
@@ -320,18 +322,109 @@ class XlsxResultsWriter(object):
 
     def __init__(self, results):
         self.results = results
-        self.data_type_to_method = {
-            'table': self.__write_table
+        self.rtype_to_method = {
+            '12x12': self.__write_table,
+            '10x10': self.__write_table,
+            '1x10': self.__write_table,
+            'route': self.__write_route,
+            'single': self.__write_single,
+            'pandas': self.__write_table,
+            'rows': self.__write_rows
         }
 
     def write2excel(self, filename):
         wb = xls.Workbook(filename)
 
         for result in self.results.values():
-            ws = wb.add_worksheet(name=result.title)
-            self.data_type_to_method[result.data_type](ws, result.title, result.data)
+            try:
+                ws = wb.add_worksheet(name=result.title)
+            except xls.exceptions.DuplicateWorksheetName:
+                ws = wb.add_worksheet(name=result.title+' 2')
+            if result.rtype not in ['route']:
+                self.rtype_to_method[result.rtype](ws, result.title, result.data)
 
         wb.close()
 
-    def __write_table(self, ws, name, data):
-        ws.write_row()
+    def __write_table(self, ws, name, data, **kwargs):
+        pd.set_option('display.max_colwidth', -1)
+        # writing table title
+        print(name)
+        ws.write_row(0, 0, name)
+
+        if type(data) != pd.DataFrame:
+            try:
+                table = pd.DataFrame.from_dict(prepare_data(data))
+            except ValueError as e:
+                if 'scalar' in str(e):
+                    [data.update({key: [str(value)]}) for key, value in data.items()]
+                    table = pd.DataFrame.from_dict(data)
+                elif 'Invalid' in str(e):
+                    try:
+                        table = pd.DataFrame.from_dict(data)
+                    except ValueError as e:
+                        if 'scalar' in str(e):
+                            [data.update({key: [str(value)]}) for key, value in data.items()]
+                            table = pd.DataFrame.from_dict(data)
+                        else:
+                            raise e
+                else:
+                    raise e
+
+            try:
+                table.index = ('' for _ in range(len(data[list(data.keys())[0]])))  # len of column/row (table consistency assumed)
+            except ValueError as e:
+                index_len = [int(part) for part in str(e).split() if part.isdigit()][0]
+                table.index = ('' for _ in range(index_len))
+
+        if kwargs.get('transpose'):
+            table = table.T
+
+        rows = list(row.split(';') for row in table.to_csv(sep=';').split('\n'))
+
+        if kwargs.get('transpose'):
+            rows[0] = [''] + rows[0]    # add column offset to column indexes (compensate row indexes)
+
+        row_counter = 0
+        for row in rows:
+            row = [int(value) if value.isdigit() else value for value in row if value]
+
+            ws.write_row(row_counter, 0, row)
+            row_counter += 1
+        print()
+
+    def __write_route(self, ws, name, route_obj):
+        ws.write_row(name, str(route_obj))
+
+        ws.write_row('A1', ['Напрям перегону'] + ['-'.join(arc) for arc in route_obj.arcs])
+        ws.write_row('A2', ['Прямий напрям'] + [route_obj.passenger_flow[i][j] for i, j in route_obj.arcs])
+        ws.write_row('A3', ['Зворотній напрям'] + [route_obj.passenger_flow[j][i] for i, j in route_obj.arcs])
+
+        # chart = wb.add_chart({'type': 'column'})
+        chart = wb.add_chart({'type': 'line'})
+
+        chart.add_series({
+            'name': '=Sheet1!$A$2',
+            'categories': '=Sheet1!$B$1:$F$1',
+            'values': '=Sheet1!$B$2:$F$2'
+        })
+        chart.add_series({
+            'name': '=Sheet1!$A$3',
+            'categories': '=Sheet1!$B$1:$F$1',
+            'values': '=Sheet1!$B$3:$F$3'
+        })
+
+        chart.set_style(10)
+        ws.insert_chart('D2', chart)
+
+        wb.close()
+
+    def __write_single(self, ws, name, data):
+        ws.write_row(0, 0, name)
+        ws.write_row(1, 0, data)
+
+    def __write_rows(self, ws, name, data):
+        row_index = 0
+        ws.write_row(row_index, 0, name)
+        for row in data: 
+            ws.write_row(row_index, 0, row)
+            row_index += 1
