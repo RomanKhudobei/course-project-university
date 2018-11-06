@@ -245,6 +245,7 @@ def calculate_streams_speed(graph, stripes_quantity, stripe_bandwidth, upd=False
                 if (i, j) in restrict and not upd:
                     write_log('V{}-{} = 5\n\n'.format(i, j))
             else:
+                # TODO вивести 55.82 (швидкість транспортного потоку) в конфіг
                 stream_speed = (55.82 - (6.92 * 10**-5 * traffic_intensity**2))
                 stream_speed = round(stream_speed, 1)
                 if (i, j) in restrict and not upd:
@@ -756,8 +757,13 @@ def main():
 
 
     # roads_upd = [('1', '2'), ('16', '17'), ('19', '18'), ('30', '29')]
+    # print(road_classes_by_speeds)
     bad_roads = find_bad_roads(road_classes_by_speeds)
-    assert len(bad_roads) >= 3, 'Bad roads is less than 3. Pay attention.'
+    print(bad_roads)
+    print(f'INFO: bad_roads count {len(bad_roads)}')
+    # assert len(bad_roads) >= 3, 'Bad roads is less than 3. Pay attention.'
+    # if len(bad_roads) <= 3 or len(bad_roads) >= 3:
+    #     print('WARNING: Bad roads is less/more 3. Pay attention.')
 
     stripes_quantity_upd = update_stripes(stripes_quantity, bad_roads)
 
@@ -794,30 +800,39 @@ def main():
     #sumbit_rows_and_columns(correspondences)
     #test_calculations(correspondences, flows)
 
+def adopt_speeds_to_variant(speeds, variant):
+    adopted_speeds = {}
+    adopt_value = float('.'.join(list(variant)))
+
+    for i in speeds:
+        adopted_speeds[i] = {}
+        for j in speeds[i]:
+
+            result = round(float(speeds[i][j]) + adopt_value, 1)
+            adopted_speeds[i][j] = result
+
+    return adopted_speeds
+
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Usage: user_name')
+    if len(sys.argv) != 3:
+        print('Usage: user_name variant')
         sys.exit(1)
 
     user_name = sys.argv[1]
+    variant = sys.argv[2]
+
+    if len(variant) == 1:
+        variant = '0' + variant
 
     print('Welcome, {}!'.format(user_name))
     print('Thank you for using our service. Enjoy.')
 
-    # variants of graphs by user_name
-    variants = {
-        'Роман-Худобей': config.GRAPH,
-        'Віталій-Стахів': config.STAHIV_GRAPH,
-        'Уляна-Жигальська': config.JUGALSKA_GRAPH,
-        'Соломія-Скоробагата': config.SKOROBAGATA_GRAPH
-    }
-
-    graph = variants[user_name]
+    graph = config.GRAPH
 
     n = config.N
     nodes = config.NODES
-    speeds = config.SPEEDS
+    speeds = adopt_speeds_to_variant(config.SPEEDS, variant)
     flows = config.FLOWS
     stripes_quantity = config.STRIPES_QUANTITY
     stripe_bandwidth = config.STRIPE_BANDWIDTH
