@@ -218,7 +218,38 @@ def write_results(data, filename):
 
     return result
 
-def calculate_streams_speed(graph, stripes_quantity, stripe_bandwidth, upd=False):
+def calculate_transport_flow(graph, paths, correspondences):
+    transport_flow = {}
+
+    for i in graph:
+        transport_flow[i] = {}
+        for j in graph[i]:
+
+            pas_flow = 0
+            between = []
+
+            for m in nodes:
+                for n in nodes:
+
+                    if (i, j) in get_arcs(paths[m][n]):
+                        try:
+                            pas_flow += correspondences[m][n]
+                            between.append(
+                                (f'H{m}-{n}', str(correspondences[m][n]))
+                            )
+
+                        except KeyError:
+                            continue
+
+            result = round(pas_flow, 0)
+            transport_flow[i][j] = result
+
+            if between:
+                write_log(f"Q{i}-{j} = {' + '.join(data[0] for data in between)} = {' + '.join(data[1] for data in between)} = {result}\n")
+
+    return transport_flow
+
+def calculate_streams_speed(graph, flows, stripes_quantity, stripe_bandwidth, upd=False):
     if not upd:
         write_log('Formula (2.5)\n\n')
     transport_streams_speed = {}
@@ -229,16 +260,16 @@ def calculate_streams_speed(graph, stripes_quantity, stripe_bandwidth, upd=False
         transport_intensity[i] = {}
         for j in graph[i]:
             #print('i: {}; j: {}.'.format(i, j))
-            creation_flow = float(flows[i]['creation'])
+            # creation_flow = float(flows[i]['creation'])
             #print('creation_flow: {}'.format(creation_flow))
             count_stripes = float(stripes_quantity[i][j])
             #print('count_stripes: {}'.format(count_stripes))
             
-            traffic_intensity = creation_flow / count_stripes
+            traffic_intensity = flows[i][j] / count_stripes
             #print('traffic_intensity: {}'.format(traffic_intensity))
 
             if (i, j) in restrict and not upd:
-                write_log('N{}-{} = {} / {} = {}\n'.format(i, j, creation_flow, count_stripes, traffic_intensity))
+                write_log('N{}-{} = {} / {} = {}\n'.format(i, j, flows[i][j], count_stripes, traffic_intensity))
             
             if traffic_intensity > stripe_bandwidth:
                 stream_speed = 5
@@ -260,6 +291,7 @@ def calculate_streams_speed(graph, stripes_quantity, stripe_bandwidth, upd=False
 
     if not upd:
         write_log('{}\n\n'.format('_'*50))
+
     return transport_streams_speed, transport_intensity
 
 def calculate_criteria_efficient(transport_intensity, transportation_costs, time_movements, lens):
@@ -430,10 +462,11 @@ def set_class_road_by_overload(coefs_overload):
             elif coefs_overload[i][j] <= 1:
                 road_classes[i][j] = 'E'
 
-            elif 0 < coefs_overload[i][j] < 1:
+            elif coefs_overload[i][j] > 1:
                 road_classes[i][j] = 'F'
 
             else:
+                print(coefs_overload[i][j])
                 raise ValueError('Class road out of range')
 
     return road_classes
@@ -594,7 +627,11 @@ def write_table30x30(ws, name, data):
             row = int(i) + 2    # to compensate header
             column = int(j) + 1     # to compensate row indexes
             value = data[i].get(j, '')
-            cell = ws.cell(row=row, column=column, value=value)
+
+            if type(value) is list:
+                value = '>'.join(value)
+
+            cell = ws.cell(row=row, column=column, value=value or '')
             cell.border = border
 
 def format_data_type(row):
@@ -712,6 +749,7 @@ def main():
 
     lens, paths = calculate_lens_and_paths(graph)
     mds['Найкоротшi вiдстанi'] = lens
+    mds['Шляхи найкоротших відстаней'] = paths
 
     time_movements = calculate_time_movements(lens, paths, speeds, nodes)
     mds['Часи руху'] = time_movements
@@ -723,7 +761,10 @@ def main():
     mds['Кореспонденцiї'] = correspondences
     mds['Функція тяжіння між вузлами'] = Dij
 
-    transport_streams_speed, transport_intensity = calculate_streams_speed(graph, stripes_quantity, stripe_bandwidth)
+    transport_flow = calculate_transport_flow(graph, paths, correspondences)
+    mds['Транспортні потоки'] = transport_flow
+
+    transport_streams_speed, transport_intensity = calculate_streams_speed(graph, transport_flow, stripes_quantity, stripe_bandwidth)
     mds['Швидкостi потокiв'] = transport_streams_speed
     mds['Iнтенсивностi потокiв'] = transport_intensity
 
@@ -767,7 +808,7 @@ def main():
 
     stripes_quantity_upd = update_stripes(stripes_quantity, bad_roads)
 
-    transport_streams_speed_upd, transport_intensity_upd = calculate_streams_speed(graph, stripes_quantity_upd, stripe_bandwidth, upd=True)
+    transport_streams_speed_upd, transport_intensity_upd = calculate_streams_speed(graph, transport_flow, stripes_quantity_upd, stripe_bandwidth, upd=True)
     cost_efficient_upd, lens_efficient_upd, time_efficient_upd = calculate_criteria_efficient(transport_intensity_upd, transportation_costs, time_movements, lens)
     #print(time_efficient_upd)      # thus for text
     coefs_overload_upd = calculate_coefs_overload(transport_intensity_upd, stripes_quantity_upd, stripe_bandwidth, upd=True)
