@@ -130,7 +130,7 @@ def calculate_Dij(lens, flows, nodes):
             HPj = flows[j]['absorbtion']
             #print('HPj: {}'.format(HPj))
             if i == j:
-                Cij = 0.01
+                Cij = 0.01 + 0.01 * variant
             else:
                 Cij = lens[i][j]**-1
             #print('Cij: {}'.format(Cij))
