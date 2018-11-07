@@ -843,7 +843,6 @@ def main():
 
 def adopt_speeds_to_variant(speeds, variant):
     adopted_speeds = {}
-    adopt_value = float('.'.join(list(variant)))
 
     for i in speeds:
         adopted_speeds[i] = {}
@@ -863,8 +862,10 @@ if __name__ == '__main__':
     user_name = sys.argv[1]
     variant = sys.argv[2]
 
-    if len(variant) == 1:
-        variant = '0' + variant
+    if not variant.isdigit():
+        raise ValueError('Variant must be number')
+
+    variant = int(variant) * 0.1
 
     print('Welcome, {}!'.format(user_name))
     print('Thank you for using our service. Enjoy.')
