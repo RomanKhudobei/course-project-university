@@ -305,152 +305,152 @@ BOOK_FLOWS = {
 
 STAHIV_GRAPH = {
     '1': {
-        '2': 1.5,
-        '10': 1.3
+        '2': D('1.5'),
+        '10': D('1.3')
     },
     '2': {
-        '1': 1.5,
-        '3': 2.4,
-        '9': 1.1
+        '1': D('1.5'),
+        '3': D('2.4'),
+        '9': D('1.1')
     },
     '3': {
-        '2': 2.4,
-        '4': 1.6,
-        '11': 1.0
+        '2': D('2.4'),
+        '4': D('1.6'),
+        '11': D('1.0')
     },
     '4': {
-        '3': 1.6,
-        '5': 2.6
+        '3': D('1.6'),
+        '5': D('2.6')
     },
     '5': {
-        '4': 2.6,
-        '11': 2.1,
-        '12': 1.9
+        '4': D('2.6'),
+        '11': D('2.1'),
+        '12': D('1.9')
     },
     '6': {
-        '7': 2.4,
-        '12': 1.3
+        '7': D('2.4'),
+        '12': D('1.3')
     },
     '7': {
-        '6': 2.4,
-        '8': 1.8,
-        '12': 1.5
+        '6': D('2.4'),
+        '8': D('1.8'),
+        '12': D('1.5')
     },
     '8': {
-        '7': 1.8,
-        '9': 1.3,
-        '11': 2.5
+        '7': D('1.8'),
+        '9': D('1.3'),
+        '11': D('2.5')
     },
     '9': {
-        '2': 1.1,
-        '8': 1.3,
-        '10': 1.9,
-        '11': 1.6
+        '2': D('1.1'),
+        '8': D('1.3'),
+        '10': D('1.9'),
+        '11': D('1.6')
     },
     '10': {
-        '1': 1.3,
-        '9': 1.9
- },
+        '1': D('1.3'),
+        '9': D('1.9')
+    },
     '11': {
-        '3': 1.0,
-        '5': 2.1,
-        '8': 2.5,
-        '9': 1.6,
-        '12': 1.5
-},
+        '3': D('1.0'),
+        '5': D('2.1'),
+        '8': D('2.5'),
+        '9': D('1.6'),
+        '12': D('1.5')
+    },
     '12': {
-        '5': 1.9,
-        '6': 1.3,
-        '7': 1.5,
-        '11': 1.5
+        '5': D('1.9'),
+        '6': D('1.3'),
+        '7': D('1.5'),
+        '11': D('1.5')
     }
 }
 
 
 MY_FLOWS = {
     '1': {
-        'absorption': 1800,
-        'creation': 2300
+        'absorption': D('1800'),
+        'creation': D('2300')
     },
     '10': {
-        'absorption': 1100,
-        'creation': 2100
+        'absorption': D('1100'),
+        'creation': D('2100')
     },
     '2': {
-        'absorption': 1700,
-        'creation': 1500
+        'absorption': D('1700'),
+        'creation': D('1500')
     },
     '3': {
-        'absorption': 3200,
-        'creation': 1400
+        'absorption': D('3200'),
+        'creation': D('1400')
     },
     '4': {
-        'absorption': 1500,
-        'creation': 1000
+        'absorption': D('1500'),
+        'creation': D('1000')
     },
     '5': {
-        'absorption': 1600,
-        'creation': 1900
+        'absorption': D('1600'),
+        'creation': D('1900')
     },
     '6': {
-        'absorption': 900,
-        'creation': 1400
+        'absorption': D('900'),
+        'creation': D('1400')
     },
     '7': {
-        'absorption': 1900,
-        'creation': 1000
+        'absorption': D('1900'),
+        'creation': D('1000')
     },
     '8': {
-        'absorption': 1300,
-        'creation': 2000
+        'absorption': D('1300'),
+        'creation': D('2000')
     },
     '9': {
-        'absorption': 1400,
-        'creation': 1800
+        'absorption': D('1400'),
+        'creation': D('1800')
     }
 }
 
 
 STAHIV_FLOWS = {
     '1': {
-        'absorption': 900,
-        'creation': 1400
+        'absorption': D('900'),
+        'creation': D('1400')
     },
     '10': {
-        'absorption': 1600,
-        'creation': 2600
+        'absorption': D('1600'),
+        'creation': D('2600')
     },
     '2': {
-        'absorption': 1900,
-        'creation': 1200
+        'absorption': D('1900'),
+        'creation': D('1200')
     },
     '3': {
-        'absorption': 2700,
-        'creation': 900
+        'absorption': D('2700'),
+        'creation': D('900')
     },
     '4': {
-        'absorption': 1600,
-        'creation': 1300
+        'absorption': D('1600'),
+        'creation': D('1300')
     },
     '5': {
-        'absorption': 700,
-        'creation': 1900
+        'absorption': D('700'),
+        'creation': D('1900')
     },
     '6': {
-        'absorption': 600,
-        'creation': 2100
+        'absorption': D('600'),
+        'creation': D('2100')
     },
     '7': {
-        'absorption': 2700,
-        'creation': 800
+        'absorption': D('2700'),
+        'creation': D('800')
     },
     '8': {
-        'absorption': 600,
-        'creation': 1500
+        'absorption': D('600'),
+        'creation': D('1500')
     },
     '9': {
-        'absorption': 1300,
-        'creation': 900
+        'absorption': D('1300'),
+        'creation': D('900')
     }
 }
 

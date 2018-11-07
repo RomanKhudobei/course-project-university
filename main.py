@@ -5,9 +5,10 @@ from logger import Logger
 
 
 if __name__ == '__main__':
-    graph = Graph(config.BOOK_GRAPH, config.BOOK_FLOWS, routes=config.ROUTES_FROM_BOOK)
-    # graph = Graph(config.MY_GRAPH, config.MY_FLOWS, routes=config.MY_ROUTES_rebase)
-    # graph = Graph(config.MY_GRAPH, config.MY_FLOWS, auto_build_routes=True)
+    # graph = Graph(config.BOOK_GRAPH, config.BOOK_FLOWS, routes=config.ROUTES_FROM_BOOK)
+    # graph = Graph(config.MY_GRAPH, config.MY_FLOWS, routes=config.MY_ROUTES_cut)
+    graph = Graph(config.MY_GRAPH, config.MY_FLOWS, auto_build_routes=True)
+    # graph = Graph(config.STAHIV_GRAPH, config.STAHIV_FLOWS, auto_build_routes=True)
     graph.calculate()
 
     writer = ExcelResultsWriter(graph.results)
