@@ -568,16 +568,44 @@ class Route(object):
         logger.write_into('MAIN', f'kвих = {shifts_count} - 2 * {max_bus_working_count} = {exit_coef}\n')
         return exit_coef
 
-    def __calculate_one_shift_mode_count(self, max_bus_working_count, car_hours):
-        one_shift_mode_count = D('2') * max_bus_working_count - car_hours
-        assert '.' not in str(one_shift_mode_count)
-        logger.write_into('MAIN', f'2 * {max_bus_working_count} - {car_hours} = {one_shift_mode_count}\n')
-        return one_shift_mode_count
+    def __calculate_shift_modes_count(self, max_bus_working_count, car_hours, exit_coef):
+        shifts = {
+            'single': None,
+            'dual': None,
+            'triple': None
+        }
 
-    def __calculate_two_shift_mode_count(self, max_bus_working_count, car_hours):
-        two_shift_mode_count = car_hours - max_bus_working_count
-        logger.write_into('MAIN', f'{car_hours} - {max_bus_working_count} = {two_shift_mode_count}\n')
-        return two_shift_mode_count
+        if exit_coef < 0:
+            shifts['single'] = D('2') * max_bus_working_count - car_hours
+            shifts['dual'] = car_hours - max_bus_working_count
+            shifts['triple'] = 0
+
+            logger.write_into('MAIN', f"(Однозмінний режим) 2 * {max_bus_working_count} - {car_hours} = {shifts['single']}\n")
+            logger.write_into('MAIN', f"(Двозмінний режим) {car_hours} - {max_bus_working_count} = {shifts['dual']}\n")
+            logger.write_into('MAIN', f"(Трьохзмінний режим) 0\n")
+
+        elif exit_coef == 0:
+            shifts['single'] = 0
+            shifts['dual'] = max_bus_working_count
+            shifts['triple'] = 0
+
+            logger.write_into('MAIN', f'(Однозмінний режим) 0\n')
+            logger.write_into('MAIN', f'(Двозмінний режим) {max_bus_working_count}\n')
+            logger.write_into('MAIN', f'(Трьохзмінний режим) 0\n')
+
+        elif exit_coef > 0:
+            shifts['single'] = 0
+            shifts['dual'] = D('3') * max_bus_working_count - car_hours
+            shifts['triple'] = car_hours - D('2') * max_bus_working_count
+
+            logger.write_into('MAIN', f'(Однозмінний режим) 0\n')
+            logger.write_into('MAIN', f"(Двозмінний режим) 3 * {max_bus_working_count} - {car_hours} = {shifts['dual']}\n")
+            logger.write_into('MAIN', f"(Трьохзмінний режим) {car_hours} - 2 * {max_bus_working_count} = {shifts['triple']}\n")
+
+        assert '.' not in str(shifts['single'])
+        assert '.' not in str(shifts['dual'])
+        assert '.' not in str(shifts['triple'])
+        return shifts
 
     def calculate_bus_work_modes(self):
         results = []
@@ -649,11 +677,8 @@ class Route(object):
         logger.write_into('MAIN', '\nФормула (9.13) Розподіл робочих змін автобусних бригад (Коефіцієнт виходу)\n')
         exit_coef = self.__calculate_exit_coef(shifts_count, max_bus_working_count)
 
-        logger.write_into('MAIN', '\nФормула (9.14) Кількість змін в однозмінному режимі\n')
-        one_shift_mode_count = self.__calculate_one_shift_mode_count(max_bus_working_count, shifts_count)
-
-        logger.write_into('MAIN', '\nФормула (9.15) Кількість змін в двозмінному режимі\n')
-        two_shift_mode_count = self.__calculate_two_shift_mode_count(max_bus_working_count, shifts_count)
+        logger.write_into('MAIN', '\nКількість виходів автобусів різної змінності\n')
+        shifts = self.__calculate_shift_modes_count(max_bus_working_count, shifts_count, exit_coef)
 
         return results
 
