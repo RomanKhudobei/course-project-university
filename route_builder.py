@@ -281,13 +281,14 @@ class Route(object):
         for bus in BUSES:
             difference = abs(rational_bus_capacity - bus.capacity)
             # print(rational_bus_capacity, bus.capacity_limit)
-            if difference < closest[0] and rational_bus_capacity <= bus.capacity_limit:
+            if difference < closest[0]:     # and rational_bus_capacity <= bus.capacity_limit:
                 closest = (difference, bus)
 
         if closest[1] is not None:
             chosen = closest[1]
 
         if chosen is None:
+            print(rational_bus_capacity)
             raise ValueError('Couldn\'t choose bus from bus list')
 
         self.bus = chosen
@@ -753,7 +754,7 @@ class RouteNetworkBuilder(object):
         # route = Route(graph=self.graph)
         route = Route(path=[], graph=self.graph)
 
-        assert RECURSION_DEPTH < 5, f'The maximum recursion depth achieved'
+        # assert RECURSION_DEPTH < 5, f'The maximum recursion depth achieved'
 
         # print(f"{' ' * RECURSION_DEPTH * 4}---NEW ROUTE---")
         start_node = random.choice(list(self.graph.keys()))
