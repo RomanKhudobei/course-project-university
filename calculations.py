@@ -848,7 +848,7 @@ def adopt_speeds_to_variant(speeds, variant):
         adopted_speeds[i] = {}
         for j in speeds[i]:
 
-            result = round(float(speeds[i][j]) + adopt_value, 1)
+            result = round(float(speeds[i][j]) + variant, 1)
             adopted_speeds[i][j] = result
 
     return adopted_speeds
@@ -865,7 +865,7 @@ if __name__ == '__main__':
     if not variant.isdigit():
         raise ValueError('Variant must be number')
 
-    variant = int(variant) * 0.1
+    variant = round(int(variant) * 0.1, 1)
 
     print('Welcome, {}!'.format(user_name))
     print('Thank you for using our service. Enjoy.')
