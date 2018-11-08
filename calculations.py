@@ -220,6 +220,7 @@ def write_results(data, filename):
 
 def calculate_transport_flow(graph, paths, correspondences):
     transport_flow = {}
+    write_log('Розрахунок транспортного потоку\n\n')
 
     for i in graph:
         transport_flow[i] = {}
@@ -251,7 +252,7 @@ def calculate_transport_flow(graph, paths, correspondences):
 
 def calculate_streams_speed(graph, flows, stripes_quantity, stripe_bandwidth, upd=False):
     if not upd:
-        write_log('Formula (2.5)\n\n')
+        write_log('\nFormula (2.5)\n\n')
     transport_streams_speed = {}
     transport_intensity = {}
     global restrict
