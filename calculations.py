@@ -52,7 +52,7 @@ def get_arcs(path):
     return arcs
 
 def calculate_time_movements(lens, paths, speeds, nodes):
-    write_log('Formula (2.2)\n\n')
+    write_log('Формула (2.2)\n\n')
     time_movements = {}
     for i in nodes:
         time_movements[i] = {}
@@ -64,8 +64,10 @@ def calculate_time_movements(lens, paths, speeds, nodes):
             #print('arcs: {}'.format(arcs))
             time_movement = float(0)
 
-            if (i, j) == ('1', '4'):
-                write_log('Шлях {}-{} = {}\n'.format(i, j, arcs))
+            if (i, j) in restrict:
+                write_log('Шлях {}-{}: {}\n'.format(i, j, ' > '.join(path)))
+
+            between = []
 
             for arc in arcs:
                 #print
@@ -77,12 +79,12 @@ def calculate_time_movements(lens, paths, speeds, nodes):
                 sub_result = lenght / speed
                 time_movement = time_movement + sub_result
 
-                if (i, j) == ('1', '4'):
+                if (i, j) in restrict:
                     write_log('    T{}-{} = {} / {} = {}\n'.format(arc[0], arc[1], lenght, speed, round(sub_result, 3)))
 
             time_movement = round(time_movement, 3)
 
-            if (i, j) == ('1', '4'):
+            if (i, j) in restrict:
                 write_log('T{}-{} = {}\n\n'.format(i, j, time_movement))
 
             time_movements[i][j] = time_movement
@@ -98,7 +100,7 @@ def write_log(text):
     log += text
 
 def calculate_transportation_costs(lens, time_movements, nodes):
-    write_log('Formula (2.1)\n\n')
+    write_log('Формула (2.1)\n\n')
     Cch = 0.11
     Cconst = 1.5
     transportation_costs = {}
@@ -252,7 +254,7 @@ def calculate_transport_flow(graph, paths, correspondences):
 
 def calculate_streams_speed(graph, flows, stripes_quantity, stripe_bandwidth, upd=False):
     if not upd:
-        write_log('\nFormula (2.5)\n\n')
+        write_log('\nФормула (2.5)\n\n')
     transport_streams_speed = {}
     transport_intensity = {}
     global restrict
@@ -308,7 +310,7 @@ def calculate_criteria_efficient(transport_intensity, transportation_costs, time
 
 def calculate_coefs_overload(transport_intensity, stripes_quantity, stripe_bandwidth, upd=False):
     if not upd:
-        write_log('Formula (3.1)\n\n')
+        write_log('Формула (3.1)\n\n')
     coefs_overload = {}
     global restrict
     for i in graph:
@@ -333,11 +335,11 @@ def calculate_coefs_overload(transport_intensity, stripes_quantity, stripe_bandw
         write_log('{}\n\n'.format('_'*50))
     return coefs_overload
 
-def calc_maintain_expenses(stripes, upd=False):    # first arg of main expense formula
+def calc_maintain_expenses(stripes, upd=False):    # first arg of main expense Формула
     if upd:
-        write_log('Fromula (5.2) (Пропонований)\n\n')
+        write_log('Формула (5.2) (Пропонований)\n\n')
     else:
-        write_log('Fromula (5.2) (Базовий)\n\n')
+        write_log('Формула (5.2) (Базовий)\n\n')
     # maintain_single is a arg that represents normalized cost to maintain 1 km 4-stream road
     # There's not all roads in our graph have 4-streams
     # in order to be able to multiply quantity of stripes to this price
@@ -370,9 +372,9 @@ def calc_transport_expenses(cost_efficient, upd=False):
     transport_expenses = round(transport_expenses)
 
     if upd:
-        write_log('Formula (5.3) (Пропонований)\n\n')
+        write_log('Формула (5.3) (Пропонований)\n\n')
     else:
-        write_log('Formula (5.3) (Базовий)\n\n')
+        write_log('Формула (5.3) (Базовий)\n\n')
 
     write_log('3 = (365 * {}) / 0.1 = {}\n'.format(cost_efficient, transport_expenses))
 
@@ -397,7 +399,7 @@ def calculate_total_expenses(maintain_expenses, transport_expenses, capital_expe
     transport_expenses = {0: transport_expenses}
 
     if upd:
-        write_log('Formula (5.5)\n\n')
+        write_log('Формула (5.5)\n\n')
 
     for t in range(0, 11):
         
@@ -817,7 +819,7 @@ def main():
     maintain_expenses_upd = calc_maintain_expenses(stripes_quantity_upd, upd=True)
     transport_expenses_upd = calc_transport_expenses(cost_efficient_upd, upd=True)
     capital_expense_upd = calc_capital_expense(bad_roads)
-    write_log('Formula (5.4)\n\nКапітальні витрати становлять: {}\n{}\n\n'.format(capital_expense_upd, '_'*50))
+    write_log('Формула (5.4)\n\nКапітальні витрати становлять: {}\n{}\n\n'.format(capital_expense_upd, '_'*50))
 
     maintain_expenses_upd, transport_expenses_upd, propose_total_expenses, coefs_kt = calculate_total_expenses(maintain_expenses_upd, transport_expenses_upd, capital_expense_upd, discount, upd=True)
 
@@ -882,6 +884,7 @@ if __name__ == '__main__':
     log = ''
     log_filename = '{}-log.txt'.format(user_name)
     restrict = [('1', '2'), ('2', '3'), ('3', '4')]     # format: (i, j); in order to restrict writing to log file
+    # restrict = [(i, j) for i in nodes for j in nodes]
 
     if graph:
         main()
