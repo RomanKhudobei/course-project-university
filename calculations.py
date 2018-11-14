@@ -82,7 +82,7 @@ def calculate_time_movements(lens, paths, speeds, nodes):
                 if (i, j) in restrict:
                     write_log('    T{}-{} = {} / {} = {}\n'.format(arc[0], arc[1], lenght, speed, round(sub_result, 3)))
 
-            time_movement = round(time_movement, 3)
+            time_movement = round(time_movement, 2)
 
             if (i, j) in restrict:
                 write_log('T{}-{} = {}\n\n'.format(i, j, time_movement))
@@ -161,18 +161,14 @@ def calculate_correspondences(lens, flows, nodes):
     for i in nodes:
         correspondences[i] = {}
         for j in nodes:
-            #print('i: {}; j: {}'.format(i, j))
+            # write_log('i: {}; j: {}\n'.format(i, j))
             HOi = flows[i]['creation']
-            #print('HOi: {}'.format(HOi))
             top = Dij[i][j]
-            #print('top: {}'.format(top))
             bottom = calculate_matrix_row(i, Dij)
-            #print('bottom: {}'.format(bottom))
-            result = HOi * (top / bottom)
-            #print('{} * ({} / {}) = {}'.format(HOi, top, bottom, result))
-            #print('-'*50)
-            #print()
-            correspondences[i][j] = round(result, 2)
+
+            result = round(HOi * (top / bottom))
+            # write_log('{} * ({} / {}) = {}\n'.format(HOi, top, bottom, result))
+            correspondences[i][j] = result
     return Dij, correspondences
 
 def test_calculations(correspondences, flows):
@@ -197,8 +193,8 @@ def sumbit_rows_and_columns(correspondences):
         for j in nodes:
             row = row + calculate_matrix_row(i, correspondences)
             column = column + calculate_matrix_column(j, correspondences)
-    row = round(row, 2)
-    column = round(column, 2)
+    row = round(row, 0)
+    column = round(column, 0)
     print('sumbit rows: {}'.format(row))
     print('sumbit columns: {}'.format(column))
 
@@ -252,6 +248,31 @@ def calculate_transport_flow(graph, paths, correspondences):
 
     return transport_flow
 
+def collect_values(d):
+    values = []
+
+    if type(d) is not dict:
+        raise ValueError('Only dict required')
+
+    for value in d.values():
+        if type(value) is dict:
+            values += collect_values(value)
+            continue
+        values.append(value)
+
+    return values
+
+def test_transport_flow(graph, transport_flow):
+    transport_work = 0
+
+    for i in graph:
+        for j in graph[i]:
+
+            if int(i) <= int(j):
+                transport_work = transport_work + round((transport_flow[i][j] + transport_flow[j][i]) * graph[i][j], 0)
+
+    print(f'Транспортний потік {sum(collect_values(transport_flow))}; Транспортна робота {transport_work}')
+
 def calculate_streams_speed(graph, flows, stripes_quantity, stripe_bandwidth, upd=False):
     if not upd:
         write_log('\nФормула (2.5)\n\n')
@@ -268,7 +289,7 @@ def calculate_streams_speed(graph, flows, stripes_quantity, stripe_bandwidth, up
             count_stripes = float(stripes_quantity[i][j])
             #print('count_stripes: {}'.format(count_stripes))
             
-            traffic_intensity = flows[i][j] / count_stripes
+            traffic_intensity = int(round(flows[i][j] / count_stripes, 0))
             #print('traffic_intensity: {}'.format(traffic_intensity))
 
             if (i, j) in restrict and not upd:
@@ -521,6 +542,56 @@ def build_table3(stripes, intensities, stream_speeds, coefs_overload, road_class
     table3 = table3.replace('.', ',')
     return table3
 
+def build_table5_just_to_copy(coefs_kt, 
+                              maintain_expenses,
+                              maintain_expenses_upd,
+                              transport_expenses,
+                              transport_expenses_upd,
+                              capital_expense_upd, 
+                              base_total_expenses, 
+                              propose_total_expenses):
+    result = 'Таблиця 5 (Без заголовка, просто скопiюй це у готову табличку в Word)\n'
+
+    for t in range(0, 11):  # year index
+        kt = coefs_kt[t]
+        if t == 0:
+            result += '{};{};{};{};{};{};{};{};{};{}\n'.format(
+                                                        t,
+                                                        kt,
+                                                        round(maintain_expenses[t] / 1000000, 1),
+                                                        round(maintain_expenses_upd[t] / 1000000, 1),
+                                                        round(transport_expenses[t] / 1000000, 1),
+                                                        round(transport_expenses_upd[t] / 1000000, 1),
+                                                        0,
+                                                        round(capital_expense_upd*kt / 1000000, 1),
+                                                        round(base_total_expenses[t] / 1000000, 1),
+                                                        round(propose_total_expenses[t] / 1000000, 1))
+        else:
+            result += '{};{};{};{};{};{};{};{};{};{}\n'.format(
+                                                        t,
+                                                        kt,
+                                                        round(maintain_expenses[t] / 1000000, 1),
+                                                        round(maintain_expenses_upd[t] / 1000000, 1),
+                                                        round(transport_expenses[t] / 1000000, 1),
+                                                        round(transport_expenses_upd[t] / 1000000, 1),
+                                                        0,
+                                                        0,
+                                                        round(base_total_expenses[t] / 1000000, 1),
+                                                        round(propose_total_expenses[t] / 1000000, 1))
+
+    result += ';Всього;{};{};{};{};{};{};{};{}'.format(
+                                                '=SUM(C2:C12)',
+                                                '=SUM(D2:D12)',
+                                                '=SUM(E2:E12)',
+                                                '=SUM(F2:F12)',
+                                                '=SUM(G2:G12)',
+                                                '=SUM(H2:H12)',
+                                                '=SUM(I2:I12)',
+                                                '=SUM(J2:J12)')
+
+    result = result.replace('.', ',')
+
+    return result
 
 def build_table5(coefs_kt, 
                  maintain_expenses,
@@ -543,7 +614,7 @@ def build_table5(coefs_kt,
                                                         transport_expenses[t],
                                                         transport_expenses_upd[t],
                                                         0,
-                                                        round(capital_expense_upd*kt),
+                                                        capital_expense_upd*kt,
                                                         base_total_expenses[t],
                                                         propose_total_expenses[t])
         else:
@@ -634,7 +705,7 @@ def write_table30x30(ws, name, data):
             if type(value) is list:
                 value = '>'.join(value)
 
-            cell = ws.cell(row=row, column=column, value=value or '')
+            cell = ws.cell(row=row, column=column, value=value or 0)
             cell.border = border
 
 def format_data_type(row):
@@ -761,8 +832,8 @@ def main():
     mds['Транспортнi витрати'] = transportation_costs
 
     Dij, correspondences = calculate_correspondences(lens, flows, nodes)
-    mds['Кореспонденцiї'] = correspondences
     mds['Функція тяжіння між вузлами'] = Dij
+    mds['Кореспонденцiї'] = correspondences
 
     transport_flow = calculate_transport_flow(graph, paths, correspondences)
     mds['Транспортні потоки'] = transport_flow
@@ -839,10 +910,21 @@ def main():
 
     shutil.move(source, destination)    # move result file in "Results" directory
 
+    # log_paths(paths)      # for additions
+
     # test cases
 
-    #sumbit_rows_and_columns(correspondences)
-    #test_calculations(correspondences, flows)
+    # sumbit_rows_and_columns(correspondences)
+    # test_calculations(correspondences, flows)
+    # test_transport_flow(graph, transport_flow)
+
+def log_paths(paths):
+    write_log('Шляхи для додатку\n')
+    for i in nodes:
+        for j in nodes:
+
+            if i != j:
+                write_log(f"{i}-{j}: {'>'.join(paths[i][j])}\n")
 
 def adopt_speeds_to_variant(speeds, variant):
     adopted_speeds = {}
