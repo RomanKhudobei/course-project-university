@@ -61,9 +61,9 @@ class Route(object):
         # 'Коефіцієнт непрямолінійності'
     ]
 
-    def __init__(self, path=[], graph=None, bus=None):
+    def __init__(self, path=[], graph=None, bus=None, number=None):
         # TODO: write setters/getters like in graph
-        self.__id = str(random.randint(0, 500))    # TODO: add number property to identificate each route
+        self.number = number
         self.path = path
         self.__efficiency = D('0')
         self.graph = graph
@@ -161,7 +161,7 @@ class Route(object):
                 logger.write_into('6.3', f"N{i}-{j} = {' + '.join(sbetween)} = {pass_flow_straight}\n")
                 logger.write_into('6.3', f"N{j}-{i} = {' + '.join(rbetween)} = {pass_flow_reverse}\n")
                 log_count += 2
-                logger.write_into('6.3', '$route_efficiency_placeholder_' + self.__id + '$')
+                logger.write_into('6.3', '$route_efficiency_placeholder_' + self.number + '$')
 
             self.passenger_flow[i].update({j: pass_flow_straight})
             self.passenger_flow[j].update({i: pass_flow_reverse})
@@ -192,7 +192,7 @@ class Route(object):
         self.__efficiency = route_efficiency
         self.economical_stats['Коефіцієнт ефективності'] = self.__efficiency
         efstr = f'kеф = {top} / {bottom} = {route_efficiency}'
-        logger.set_room('6.3', logger.get_room('6.3').replace(f'$route_efficiency_placeholder_{self.__id}$', efstr + '\n'))
+        logger.set_room('6.3', logger.get_room('6.3').replace(f'$route_efficiency_placeholder_{self.number}$', efstr + '\n'))
         return route_efficiency
 
     def slice_from_redistributed_correspondences(self, heading='Матриця міжрайонних кореспонденцій для маршруту'):
@@ -821,7 +821,9 @@ class RouteNetworkBuilder(object):
                 # print('TOO SIMILAR\n')
                 continue
             # print('ACCEPTED\n')
-            self.__routes[next(routes_indexes)] = route
+            route_number = next(routes_indexes)
+            route.number = route_number
+            self.__routes[route_number] = route
 
         return self.__routes
 

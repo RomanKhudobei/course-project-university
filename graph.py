@@ -42,7 +42,7 @@ class Graph(object):
 
         if len(routes.values()) > 0 and (list(routes.values())[0] is not Route):
             for route_num, route_path in routes.items():
-                routes[route_num] = Route(path=route_path, graph=self)
+                routes[route_num] = Route(path=route_path, graph=self, number=route_num)
 
         self.__routes = routes
 
