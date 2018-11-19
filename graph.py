@@ -392,12 +392,34 @@ class Graph(object):
 
         return Result('10x10', 'Перерозподілені кореспонденції', redistributed_correspondences)
 
+    def __remove_weak_routes(self, routes, efficiency_limit=0.6):
+        '''
+            Removes weak routes and stacks result
+            Example:
+                we have routes [1, 2, 3, 4, 5]
+                [1, 2] is weak and result list is [3, 4, 5]
+                Stacking does this thing [3, 4, 5] => [1, 2, 3]
+        '''
+
+        # The problem is that even if all routes meet requirements
+        # it doesn't mean that count_connections meet
+        stacked_routes = {}
+        new_route_indexes = (str(i) for i in range(1, len(routes)+1))
+        for route_number in routes:
+            print('route efficiency', routes[route_number].efficiency())
+            if routes[route_number].efficiency() >= efficiency_limit:
+                stacked_routes[next(new_route_indexes)] = routes[route_number]
+
+        print('stacked', stacked_routes.keys())
+        return stacked_routes
+
     def __build_network(self):
         logger.clear_room('6.2')
         logger.clear_room('6.3')
+        # logger.clear_room('stderr')
 
-        if not self.__routes and self.auto_build_routes:
-            builder = RouteNetworkBuilder(self, routes_count=5, avg_route_length=6, network_efficiency=0.6, stack_size=50)
+        if self.auto_build_routes:      # and not self.__routes 
+            builder = RouteNetworkBuilder(self, routes=self.__routes, routes_count=5, avg_route_length=6, network_efficiency=0.6, stack_size=50, )
             self.__routes = builder.build_network()
 
         connections = self.__check_routes(self.__routes)
@@ -408,15 +430,49 @@ class Graph(object):
         self.results.update({'redistributed_correspondences': redistributed_correspondences})
 
         count_connections = self.__count_connections(connections.data)
+        # logger.write_into('stderr', f'\n{str(count_connections)}\n')
 
         # 6.3
         self.__calculate_passenger_flows_on_routes(self.__routes)
 
+        # logger.write_into('stderr', 'Route number | Efficiency')
+        # map(lambda r: logger.write_into('stderr', f'\n{r.number} {r.efficiency()}\n'), self.__routes.values())
+        print(count_connections)
         if (count_connections[0] >= D('20') or any(map(lambda route: route.efficiency() < 0.6, self.__routes.values()))) and self.auto_build_routes:    # TODO: get this values from command line
+
+            # if not any(map(lambda route: route.efficiency() < 0.6, self.__routes.values())):
+            #     print('\n' + 'RESET '*5 + '\n')
+            #     self.__routes = {}
+            # else:
+            #     self.__routes = self.__remove_weak_routes(self.__routes)
+
             self.__routes = {}
             return self.__build_network()
 
         return count_connections
+
+    def __unite_connections(self, route, connections={}):
+        
+        for i in self.NODES:
+            connections.setdefault(i, {})
+            for j in self.NODES:
+
+                if i in route and j in route:
+                    connections[i][j] = '+'
+
+        return connections
+
+    def __generate_tables_5plus(self, routes):
+        connections = {}
+
+        # reduce algorithm
+        united_routes = []
+        for route_num, route_obj in routes.items():
+            united_routes.append(route_num)
+            connections = self.__unite_connections(route_obj.path, connections)
+            self.results.update({f'connections_for_route_{route_num}': Result('10x10', f"МатБезпересаджМаршр{'+'.join(united_routes)}", deepcopy(connections))})
+
+        return connections
 
     def __test_calculate_passenger_flows_on_all_routes(self):
         from route_builder import Route
@@ -452,7 +508,7 @@ class Graph(object):
     def __count_connections(self, connections):
         """ Invert to __check_routes. Show which nodes have how many connections """
         count = {}
-        [count.update({i: 0}) for i in range(6)]
+        [count.update({i: 0}) for i in range(10)]
 
         for i in connections:
             for j in connections[i]:
@@ -753,10 +809,20 @@ class Graph(object):
         recommendations = self.__make_recommendations(passenger_flows.data)
         self.results.update({'recommendations': recommendations})
 
-        count_connections = self.__build_network()
+        try:
+            count_connections = self.__build_network()
+        except RecursionError:
+            print('After 1000 times I still can\'t build network for you, sorry.\n' +
+                  'Try to change configuration and start me again.\n' +
+                  'By the way... Can you give me sock back?')
+            sys.exit(0)     # TODO: or start program again
+
         print('count_connections (how many zeros)', count_connections)
         network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))
         print('Network efficiency', network_efficiency)
+
+        # generate tables 5.1 ... 5.n, where n - routes count
+        self.__generate_tables_5plus(self.__routes)
 
         # Таблиця 5.5
         table = {

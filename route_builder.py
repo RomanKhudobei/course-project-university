@@ -299,6 +299,18 @@ class Route(object):
         logger.write_into('MAIN', f'- маршрут {self} - автобус {self.bus.name};\n')
         return chosen
 
+    def __check_connections(self):
+        self.connections = {}
+
+        for i in self.graph.NODES:
+            self.connections[i] = {}
+            for j in self.graph.NODES:
+
+                if i in self.path and j in self.path:
+                    self.connections[i][j] = '+'
+
+        return self.connections
+
     def __calculate_technical_speed(self):
         return D('20') + config.LAST_CREDIT_DIGIT
 
@@ -732,7 +744,7 @@ class Route(object):
 
 class RouteNetworkBuilder(object):
 
-    def __init__(self, graph, routes_count=5, avg_route_length=6, network_efficiency=0.45,
+    def __init__(self, graph, routes={}, routes_count=5, avg_route_length=6, network_efficiency=0.45,
                  similarity_percentage_allowed=45, stack_size=50):
         self.graph = graph
         self.routes_count = routes_count
@@ -740,7 +752,7 @@ class RouteNetworkBuilder(object):
         self.network_efficiency = network_efficiency
         self.similarity_percentage_allowed = similarity_percentage_allowed
         self.__stack_size = stack_size
-        self.__routes = {}
+        self.__routes = routes
 
     def build_route(self, route_length=0, RECURSION_DEPTH=0):  # hangs sometimes. don't know why	->	maybe when trying to pick up next node but all potential_next_nodes already in route, so can't pick next one and hangs in infinite loop. UPD: yes. UPD: solved by __make_sense. I'll leave this here like in museum to watch myself thoughts. awesome. ... Still hangs sometimes. UPD: The problem was with equality check in __make_sense. Sometimes order of two operands may differ but values were the same. Solved by converting is set instead list.
         route_length = route_length or self.avg_route_length
@@ -812,8 +824,8 @@ class RouteNetworkBuilder(object):
 
     def build_network(self):
         # generating keys for routes, to store in dict
-        routes_indexes = (str(i) for i in range(1, self.routes_count + 1))
-        self.__routes = {}
+        routes_indexes = (str(i) for i in range(len(self.__routes)+1, self.routes_count+1))
+
         while len(self.__routes) < self.routes_count:
             route = self.build_route()
 

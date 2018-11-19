@@ -68,7 +68,7 @@ class Logger(object):
     def delete_room(self, room, force=False):
         self.__check(room)
         if self.__ROOMS[room] and not force:
-            raise Exception(f'Room {foom} is not empty')
+            raise Exception(f'Room {room} is not empty')
         del self.__ROOMS[room]
 
     def write_into(self, room, string, create_if_not_exist=False):
