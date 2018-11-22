@@ -82,7 +82,7 @@ def calculate_time_movements(lens, paths, speeds, nodes):
                 if (i, j) in restrict:
                     write_log('    T{}-{} = {} / {} = {}\n'.format(arc[0], arc[1], lenght, speed, round(sub_result, 3)))
 
-            time_movement = round(time_movement, 2)
+            time_movement = round(time_movement, 3)
 
             if (i, j) in restrict:
                 write_log('T{}-{} = {}\n\n'.format(i, j, time_movement))
@@ -114,7 +114,7 @@ def calculate_transportation_costs(lens, time_movements, nodes):
             #print('time: {}'.format(time))
             cost = ( (Cch * lenght) + (Cconst * time) )
             #print('cost: {}'.format(cost))
-            cost = round(cost, 2)
+            cost = round(cost, 3)
             transportation_costs[i][j] = cost
 
             if (i, j) in restrict:
@@ -136,7 +136,7 @@ def calculate_Dij(lens, flows, nodes):
             else:
                 Cij = lens[i][j]**-1
             #print('Cij: {}'.format(Cij))
-            result = round(HPj * Cij, 2)
+            result = round(HPj * Cij, 3)
             #print('result: {}'.format(result))
             #print('-'*50)
             #print()
@@ -302,7 +302,7 @@ def calculate_streams_speed(graph, flows, stripes_quantity, stripe_bandwidth, up
             else:
                 # TODO вивести 55.82 (швидкість транспортного потоку) в конфіг
                 stream_speed = (55.82 - (6.92 * 10**-5 * traffic_intensity**2))
-                stream_speed = round(stream_speed, 1)
+                stream_speed = round(stream_speed, 3)
                 if (i, j) in restrict and not upd:
                     write_log('V{}-{} = 55.82 - (6.92 * 10^-5 * {}^2) = {}\n\n'.format(i, j, traffic_intensity, stream_speed))
 
@@ -349,7 +349,7 @@ def calculate_coefs_overload(transport_intensity, stripes_quantity, stripe_bandw
             if (i, j) in restrict and not upd:
                 write_log('K{}-{} = {} / ({} * {}) = {}\n'.format(i, j, intensity, stripes, stripe_bandwidth, c_overload))
             
-            coefs_overload[i][j] = round(c_overload, 2)
+            coefs_overload[i][j] = round(c_overload, 3)
             #print('-'*50)
             #print()
     if not upd:
