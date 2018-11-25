@@ -88,6 +88,14 @@ class Route(object):
             arcs.append(arc)
         return arcs
 
+    @property
+    def full_arcs(self):
+        arcs = self.arcs
+        for index in range(len(arcs)):
+            i, j = arcs[index]
+            arcs.append((j, i))
+        return arcs
+
     def calculate_passenger_flow(self, missed_flows=None, force=False):     # TODO Numpy has this functionality. Rewrite using it (2-3 rows of code)
         if not self.graph:
             raise AttributeError('Provide graph to calculate passenger flow of the route')
@@ -98,7 +106,10 @@ class Route(object):
         logger.write_into('6.3', f"\nФормула (6.3) Для маршруту {self} {'(із неврахованим пасажиропотоком)' if missed_flows else ''}\n", create_if_not_exist=True)
         log_count = 0
 
+        # print(self)
+
         for i, j in self.arcs:
+            # print(f'    i-j: {i}-{j}')
 
             pass_flow_straight = D('0')
             pass_flow_reverse = D('0')
@@ -112,8 +123,8 @@ class Route(object):
             sbetween = []
             rbetween = []
 
-            for m in self.graph.results['redistributed_correspondences'].data:
-                for n in self.graph.results['redistributed_correspondences'].data[m]:
+            for m in self.graph.NODES_12:
+                for n in self.graph.NODES_12:
 
                     try:
                         m_index = self.path.index(m)
@@ -122,9 +133,12 @@ class Route(object):
                         continue
 
                     if m_index <= row_index and n_index >= column_index:
+                        # print(f'        m-n: {m}-{n}')
+                        result = D('0')
                         try:
-                            pass_flow_straight += self.graph.results['redistributed_correspondences'].data[m][n]
-                            sbetween.append(str(self.graph.results['redistributed_correspondences'].data[m][n]))
+                            result += self.graph.results['redistributed_correspondences'].data[m][n]
+                            # sbetween.append(str(self.graph.results['redistributed_correspondences'].data[m][n]))
+                            # print(f'        straight {pass_flow_straight} (+{result})')
 
                         except TypeError:
                             pass
@@ -132,17 +146,26 @@ class Route(object):
                         except KeyError:
                             pass
 
-                        if missed_flows:
-                            pass_flow_straight += missed_flows[m][n]
-                            sbetween.append(str(missed_flows[m][n]))
+                        if missed_flows and (m, n) in self.full_arcs:
+                            result += missed_flows[m][n]
+                            # print(f'        missed {pass_flow_straight} (+{missed_flows[m][n]})')
+                            # sbetween.append(str(missed_flows[m][n]))
+
+                        pass_flow_straight += result
+                        sbetween.append(str(result))
+                        # print()
 
                     # calculate reverse
                     row_index, column_index = column_index, row_index
 
                     if m_index >= row_index and n_index <= column_index:
+                        # print(f'        m-n: {m}-{n}')
+                        result = D('0')
                         try:
-                            pass_flow_reverse += self.graph.results['redistributed_correspondences'].data[m][n]
-                            rbetween.append(str(self.graph.results['redistributed_correspondences'].data[m][n]))
+                            result += self.graph.results['redistributed_correspondences'].data[m][n]
+                            # pass_flow_reverse += result
+                            # rbetween.append(str(self.graph.results['redistributed_correspondences'].data[m][n]))
+                            # print(f'        reverse {pass_flow_reverse} (+{result})')
 
                         except TypeError:
                             pass
@@ -150,9 +173,14 @@ class Route(object):
                         except KeyError:
                             pass
 
-                        if missed_flows:
-                            pass_flow_reverse += missed_flows[m][n]
-                            rbetween.append(str(missed_flows[m][n]))
+                        if missed_flows and (m, n) in self.full_arcs:
+                            result += missed_flows[m][n]
+                            # print(f'        missed {pass_flow_reverse} (+{missed_flows[m][n]})')
+                            # rbetween.append(str(missed_flows[m][n]))
+
+                        pass_flow_reverse += result
+                        rbetween.append(str(result))
+                        # print()
 
                     # exchange values back again
                     row_index, column_index = column_index, row_index
@@ -195,7 +223,7 @@ class Route(object):
         logger.set_room('6.3', logger.get_room('6.3').replace(f'$route_efficiency_placeholder_{self.number}$', efstr + '\n'))
         return route_efficiency
 
-    def slice_from_redistributed_correspondences(self, heading='Матриця міжрайонних кореспонденцій для маршруту'):
+    def slice_from_redistributed_correspondences(self, heading='Матриця міжрайонних кореспонденцій для маршруту', include_missed_flow=False):
         if not self.graph:
             raise AttributeError('Provide graph to calculate passenger flow of the route')
 
@@ -208,9 +236,15 @@ class Route(object):
             row = [int(i)]      # converting into integer to avoid annoying excel mistake warning
             for j in self.path:
                 try:
-                    row += [self.graph.results['redistributed_correspondences'].data[i][j]]
+                    result = self.graph.results['redistributed_correspondences'].data[i][j]
+
                 except KeyError:
-                    row += [D('0')]
+                    result = D('0')
+
+                if include_missed_flow and (i, j) in self.full_arcs:
+                    result += self.graph.results['missed_flows'].data[i][j]
+
+                row += [result]
 
             rows.append(row)
 

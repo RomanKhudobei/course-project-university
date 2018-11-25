@@ -231,7 +231,7 @@ class Graph(object):
                 result = round(correspondences[i][j] * lens[i][j], 1)
                 transport_work[i][j] = result
 
-                if (i, j) in config.RESTRICT_LOG:
+                if (i, j) in [('1', '2'), ('2', '1')]:
                     logger.write_into('MAIN', f'P{i}-{j} = {correspondences[i][j]} * {lens[i][j]} = {result}\n')
 
         return Result('10x10', 'Транспортна робота', transport_work)
@@ -659,14 +659,21 @@ class Graph(object):
 
                 if i == j or connections[i][j] != D('0'):
                     continue
-
+                # print(f'{i}-{j}')
                 missed_flow = correspondences[i][j]
+                # print(f'missed_flow {missed_flow}')
 
                 shortest_path = self.__find_shortest_path_by_routes(i, j, routes_per_line)
-
+                # print(f'shortest path {shortest_path}')
                 for m, n in self.__get_arcs(shortest_path):
-                    missed_flows[m][n] += round(missed_flow / routes_per_line[m][n], 0)
+                    # print(f'    missed_flow before {m}-{n} = {missed_flows[m][n]}')
+                    result = round(missed_flow / routes_per_line[m][n], 0)
+                    missed_flows[m][n] += result
+                    # print(f'    {m}-{n}: {missed_flow} / {routes_per_line[m][n]} = {result}')
+                    # print(f'    missed_flow after {m}-{n} = {missed_flows[m][n]}\n')
 
+                # print('\n')
+        # print(missed_flows)
         return Result('12x12', 'Неврахований потік', missed_flows)
 
     def __generate_table_6_15(self, routes):
@@ -725,6 +732,33 @@ class Graph(object):
         result = round(sum(between) / min_transport_work, 2)
         logger.write_into('MAIN', f"Кя = {' + '.join(str(value) for value in between)} / {min_transport_work} = {result}\n")
         return result
+
+    def __test_compare_flows(self, corrected_correspondences, passenger_flows, redistributed_correspondences, missed_flows):
+        flow_by_corr_correspondences = D('0')
+        flow_by_passenger_flows = D('0')
+        flow_by_complete_flows = D('0')
+
+        for i in self.NODES_12:
+            for j in self.NODES_12:
+
+                try:
+                    flow_by_corr_correspondences += corrected_correspondences[i][j]
+                except KeyError:
+                    pass
+
+                try:
+                    flow_by_passenger_flows += passenger_flows[i][j]
+                except KeyError:
+                    pass
+
+                try:
+                    flow_by_complete_flows += (redistributed_correspondences[i][j] + missed_flows[i][j])
+                except KeyError:
+                    pass
+
+        print('corrected_correspondences', flow_by_corr_correspondences)
+        print('passenger_flows', flow_by_passenger_flows)
+        print('complete_flows', flow_by_complete_flows)
 
     def calculate(self, create_xls=True):
         #
@@ -863,6 +897,8 @@ class Graph(object):
 
         missed_flows = self.__calculate_missed_flows(self.results['connections'].data, self.results['corrected_correspondences'].data, routes_per_line.data)
         self.results.update({'missed_flows': missed_flows})
+
+        # self.__test_compare_flows(corrected_correspondences.data, passenger_flows.data, self.results['redistributed_correspondences'].data, missed_flows.data)
 
         total_missed_flow = sum(self.__collect_values(missed_flows.data))
         logger.write_into('MAIN', f'Сформовані маршрути не враховують {total_missed_flow} пасажирів\n')

@@ -195,7 +195,7 @@ class ExcelResultsWriter(object):
             ws.append([])
             LAST_ROW += 1
 
-        for row in route_obj.slice_from_redistributed_correspondences(heading=f"{'Доповнена матриця міжрайонних кореспонденцій для маршруту' if kwargs.get('include_missed_flow_chart') else 'Матриця міжрайонних кореспонденцій для маршруту'}"):
+        for row in route_obj.slice_from_redistributed_correspondences(heading=f"{'Доповнена матриця міжрайонних кореспонденцій для маршруту' if kwargs.get('include_missed_flow_chart') else 'Матриця міжрайонних кореспонденцій для маршруту'}", include_missed_flow=kwargs.get('include_missed_flow_chart')):
             ws.append(row)
             LAST_ROW += 1
 
