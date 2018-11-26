@@ -392,7 +392,7 @@ class Graph(object):
 
         return Result('10x10', 'Перерозподілені кореспонденції', redistributed_correspondences)
 
-    def __remove_weak_routes(self, routes, efficiency_limit=0.6):
+    def __filter_routes(self, routes, efficiency_limit=0.6):
         '''
             Removes weak routes and stacks result
             Example:
@@ -419,7 +419,7 @@ class Graph(object):
         # logger.clear_room('stderr')
 
         if self.auto_build_routes:      # and not self.__routes 
-            builder = RouteNetworkBuilder(self, routes=self.__routes, routes_count=5, avg_route_length=6, network_efficiency=0.6, stack_size=50, )
+            builder = RouteNetworkBuilder(self, routes=self.__routes, routes_count=5, avg_route_length=6, network_efficiency=0.6, stack_size=50)
             self.__routes = builder.build_network()
 
         connections = self.__check_routes(self.__routes)
@@ -437,14 +437,15 @@ class Graph(object):
 
         # logger.write_into('stderr', 'Route number | Efficiency')
         # map(lambda r: logger.write_into('stderr', f'\n{r.number} {r.efficiency()}\n'), self.__routes.values())
-        print(count_connections)
+        # print(count_connections)
+
         if (count_connections[0] >= D('20') or any(map(lambda route: route.efficiency() < 0.6, self.__routes.values()))) and self.auto_build_routes:    # TODO: get this values from command line
 
+            # if all routes efficiency > 0.6, but count_connections[0] still > 20
             # if not any(map(lambda route: route.efficiency() < 0.6, self.__routes.values())):
-            #     print('\n' + 'RESET '*5 + '\n')
             #     self.__routes = {}
             # else:
-            #     self.__routes = self.__remove_weak_routes(self.__routes)
+            #     self.__routes = self.__filter_routes(self.__routes)
 
             self.__routes = {}
             return self.__build_network()
@@ -843,13 +844,17 @@ class Graph(object):
         recommendations = self.__make_recommendations(passenger_flows.data)
         self.results.update({'recommendations': recommendations})
 
-        try:
-            count_connections = self.__build_network()
-        except RecursionError:
-            print('After 1000 times I still can\'t build network for you, sorry.\n' +
-                  'Try to change configuration and start me again.\n' +
-                  'By the way... Can you give me sock back?')
-            sys.exit(0)     # TODO: or start program again
+        while True:
+            try:
+                count_connections = self.__build_network()
+            except RecursionError:
+                print('After 1000 times I still can\'t build network for you, sorry.\n' +
+                      'Try to change configuration and start me again.\n' +
+                      'By the way... Can you give my sock back?')
+                print('Ok-ok, retrying...')
+                continue
+                # sys.exit(0)     # TODO: or start program again
+            break
 
         print('count_connections (how many zeros)', count_connections)
         network_efficiency = sum(route.efficiency() for route in self.__routes.values()) / D(len(self.__routes))

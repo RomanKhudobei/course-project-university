@@ -748,6 +748,10 @@ class Route(object):
     def append(self, value):
         self.path.append(value)
 
+    def first(self):
+        if self.path:
+            return self.path[0]
+
     def last(self):
         if self.path:
             return self.path[-1]
@@ -803,10 +807,17 @@ class RouteNetworkBuilder(object):
         # assert RECURSION_DEPTH < 5, f'The maximum recursion depth achieved'
 
         # print(f"{' ' * RECURSION_DEPTH * 4}---NEW ROUTE---")
-        start_node = random.choice(list(self.graph.keys()))
+
+        """By task assumed that no one (human) rides to 11 or 12 node
+           so, 11 or 12 node can't be in start or end of the route."""
+        while True:
+            start_node = random.choice(list(self.graph.keys()))
+            if start_node != '11' and start_node != '12':
+                break
+
         route.append(start_node)
         # print(f"{' ' * RECURSION_DEPTH * 4}Start node: {start_node}")
-
+        # prev_node = None
         while len(route) < route_length:
             # or just random.choice( list(self.graph.get(route.last()).keys()) )
             # but this is much-much readable
@@ -832,13 +843,36 @@ class RouteNetworkBuilder(object):
                 return self.build_route(RECURSION_DEPTH=RECURSION_DEPTH)  # reset-like
 
             # try to choose another node if node already in route
+            # count = 0
             while True:
                 next_node = random.choice(potential_next_nodes)
                 # print(f"{' ' * RECURSION_DEPTH * 4}", potential_next_nodes, route)
 
+                """For example, if route is like ...8-(11|12)-9... and
+                   8 has direct connect to 9 (where 8 and 9 any node) then it is redundant
+                   to have such route because anybody don't need to ride to 11 or 12 node
+                   and we should ride ...8-9... instead."""
+                # if prev_node is not None and (last_node == '11' or last_node == '12'):
+                #     print('depth', RECURSION_DEPTH)
+                #     print('last_node', last_node)
+                #     print('prev_node', prev_node)
+                #     print(route)
+                #     print(f'next_node({next_node}) in keys prev_node({self.graph.get(prev_node).keys()})')
+                #     if next_node in self.graph.get(prev_node).keys():
+                #         print('continue')
+                #         print()
+                #         if count < 10:
+                #             continue
+                #         route.path.remove(route.last())
+                #         last_node = prev_node
+                #         prev_node = None
+
                 if next_node not in route:
                     break
 
+                # count += 1
+
+            # prev_node = last_node
             route.append(next_node)
             # print(f"{' ' * RECURSION_DEPTH * 4}Chosen: {next_node}\n")
 
@@ -855,6 +889,29 @@ class RouteNetworkBuilder(object):
     # kinda
     # def make_sense_loop(potential_next_nodes, route):
     #     return not all(map(lambda node: node in route, potential_next_nodes))
+
+    # def __irrational(self, route):
+    #     '''
+    #     Logic:
+    #         By task assumed that no one (human) rides to 11 or 12 node
+    #         so, 11 or 12 node can't be in start or end of the route.
+    #         Also, for example, if route is like ...8-(11|12)-9... and
+    #         8 has direct connect to 9 (where 8 and 9 any node) then it is redundant
+    #         to have such route because anybody don't need to ride to 11 or 12 node
+    #         and we should ride ...8-9... instead.
+    #     '''
+    #     is_corrected = None
+    #     is_rational = None
+    #     route = route
+
+    #     if ('11', '12') in route.arcs or ('12', '11') in route.arcs:
+    #         11_index = route.path.index('11')
+    #         12_index = route.path.index('12')
+
+    #         higher_index = max(11_index, 12_index)
+    #         lower_index = min(11_index, 12_index)
+
+    #         node_after = 
 
     def build_network(self):
         # generating keys for routes, to store in dict
@@ -873,12 +930,22 @@ class RouteNetworkBuilder(object):
 
         return self.__routes
 
+    def __count_similar_arcs(self, route, applied_route):
+        similar_arcs_count = 0
+
+        for i, j in route.arcs:
+            if (i, j) in applied_route.arcs or (j, i) in applied_route.arcs:
+                similar_arcs_count += 1
+
+        return similar_arcs_count
+
     def __too_similar(self, route):
         """Designed to avoid too similar routes in network"""
         for applied_route_number, applied_route in self.__routes.items():
 
-            similar_arcs = set(route.arcs) & set(applied_route.arcs)  # finds only common nodes
-            similarity_percentage = round((len(similar_arcs) / len(applied_route.arcs)) * 100, 0)
+            # similar_arcs = set(route.arcs) & set(applied_route.arcs)  # finds only common arcs
+            similar_arcs_count = self.__count_similar_arcs(route, applied_route)
+            similarity_percentage = round((similar_arcs_count / len(applied_route.arcs)) * 100, 0)
 
             # print(f'COMPARING: {route.arcs} & {applied_route.arcs}')
             # print(f'SIMILAR: {similar_arcs}')
