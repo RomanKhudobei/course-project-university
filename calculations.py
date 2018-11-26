@@ -161,13 +161,13 @@ def calculate_correspondences(lens, flows, nodes):
     for i in nodes:
         correspondences[i] = {}
         for j in nodes:
-            # write_log('i: {}; j: {}\n'.format(i, j))
             HOi = flows[i]['creation']
             top = Dij[i][j]
             bottom = calculate_matrix_row(i, Dij)
 
             result = round(HOi * (top / bottom))
-            # write_log('{} * ({} / {}) = {}\n'.format(HOi, top, bottom, result))
+            # if (i, j) in restrict:
+            #     write_log('H{}-{} = {} * ({} / {}) = {}\n'.format(i, j, HOi, top, bottom, result))
             correspondences[i][j] = result
     return Dij, correspondences
 
@@ -705,7 +705,7 @@ def write_table30x30(ws, name, data):
             if type(value) is list:
                 value = '>'.join(value)
 
-            cell = ws.cell(row=row, column=column, value=value or 0)
+            cell = ws.cell(row=row, column=column, value=value or '-')
             cell.border = border
 
 def format_data_type(row):
