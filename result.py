@@ -30,7 +30,7 @@ class ExcelResultsWriter(object):
     def __init__(self, results):
         self.results = results
         self.rtype_to_method = {
-            '12x12': self.__write_table12x12,
+            '12x12': self.__write_table15x15,
             '10x10': self.__write_table10x10,
             '1x10': self.__write_table1x10,
             'route': self.__write_route,
@@ -57,12 +57,12 @@ class ExcelResultsWriter(object):
 
         wb.save(filename)
 
-    def __write_table12x12(self, ws, name, data):
+    def __write_table15x15(self, ws, name, data):
         # writing table title
         ws.cell(row=1, column=1, value=name)
 
         # writing row and column indexes/names
-        for column in range(1, 13):
+        for column in range(1, 16):
             # column name
             # +1 in order to have place for row indexes
             cell = ws.cell(row=2, column=column+1, value=column)
@@ -77,8 +77,8 @@ class ExcelResultsWriter(object):
             cell.font = self.font
 
         # writing data into sheet
-        for i in (str(i) for i in range(1, 13)):
-            for j in (str(i) for i in range(1, 13)):
+        for i in (str(i) for i in range(1, 16)):
+            for j in (str(i) for i in range(1, 16)):
                 row = int(i) + 2  # to compensate header
                 column = int(j) + 1  # to compensate row indexes
 

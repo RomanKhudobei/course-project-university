@@ -13,13 +13,14 @@ LAST_CREDIT_DIGIT = D('5')   # 2 - остання цифра заліковки
 BEFORE_LAST_CREDIT_DIGIT = D('0')   # 5 - передостання цифра заліковки
 
 
-RESTRICT_LOG = [
-    ('1', '1'),
-    ('1', '2'),
-    ('1', '3')
-]
+# RESTRICT_LOG = [
+#     ('1', '1'),
+#     ('1', '2'),
+#     ('1', '3')
+# ]
 
 # RESTRICT_LOG = [(i, j) for i in NODES_12 for j in NODES_12]
+RESTRICT_LOG = [(str(i), str(j)) for i in range(1, 16) for j in range(1, 16)]
 
 
 HOURS = [
@@ -66,66 +67,140 @@ UNEVENNESS_COEFS_BY_HOURS = {
     '23-24': D('0.1')
 }
 
+NODE_TO_LABEL = {
+    '1': 'A1',
+    '2': 'A2',
+    '3': 'A3',
+    '4': 'A4',
+    '5': 'A5',
+    '6': 'B1',
+    '7': 'B2',
+    '8': 'B3',
+    '9': 'B4',
+    '10': 'B5',
+    '11': 'B6',
+    '12': 'B7',
+    '13': 'B8',
+    '14': 'B9',
+    '15': 'B10'
+}
+
+LABEL_TO_NODE = {
+    'A1': '1',
+    'A2': '2',
+    'A3': '3',
+    'A4': '4',
+    'A5': '5',
+    'B1': '6',
+    'B2': '7',
+    'B3': '8',
+    'B4': '9',
+    'B5': '10',
+    'B6': '11',
+    'B7': '12',
+    'B8': '13',
+    'B9': '14',
+    'B10': '15'
+}
+
 
 # next semester, new course project
 MY_GRAPH = {
-    '1': {
-        '2': D('1.1'),
-        '6': D('1.5'),
-        '11': D('1')
+    LABEL_TO_NODE['A1']: {
+        LABEL_TO_NODE['B7']: D('2'),
+        LABEL_TO_NODE['B8']: D('0.4'),
+        LABEL_TO_NODE['B10']: D('3.6')
     },
-    '2': {
-        '1': D('1.1'),
-        '3': D('1.6'),
-        '6': D('1.9')
+    LABEL_TO_NODE['A2']: {
+        LABEL_TO_NODE['A4']: D('5.2'),
+        LABEL_TO_NODE['A5']: D('2.3'),
+        LABEL_TO_NODE['B4']: D('3.9')
     },
-    '3': {
-        '2': D('1.6'),
-        '4': D('2')
+    LABEL_TO_NODE['A3']: {
+        LABEL_TO_NODE['B2']: D('3.9'),
+        LABEL_TO_NODE['B4']: D('5.9'),
+        LABEL_TO_NODE['B5']: D('3.9'),
+        LABEL_TO_NODE['B9']: D('5.3'),
     },
-    '4': {
-        '3': D('2'),
-        '5': D('1.3')
+    LABEL_TO_NODE['A4']: {
+        LABEL_TO_NODE['A2']: D('5.2'),
+        LABEL_TO_NODE['A5']: D('2.3'),
+        LABEL_TO_NODE['B1']: D('0.4'),
+        LABEL_TO_NODE['B3']: D('0.4')
     },
-    '5': {
-        '4': D('1.3'),
-        '6': D('1.6'),
-        '12': D('2.6')
+    LABEL_TO_NODE['A5']: {
+        LABEL_TO_NODE['A2']: D('2.3'),
+        LABEL_TO_NODE['A4']: D('2.3'),
+        LABEL_TO_NODE['B1']: D('2'),
+        LABEL_TO_NODE['B4']: D('2.3'),
+        LABEL_TO_NODE['B9']: D('2.3')
     },
-    '6': {
-        '1': D('1.5'),
-        '2': D('1.9'),
-        '5': D('1.6'),
-        '11': D('1.3')
+    LABEL_TO_NODE['B1']: {
+        LABEL_TO_NODE['A4']: D('0.4'),
+        LABEL_TO_NODE['A5']: D('2'),
+        LABEL_TO_NODE['B2']: D('7.5'),
+        LABEL_TO_NODE['B3']: D('1'),
+        LABEL_TO_NODE['B5']: D('3.6'),
+        LABEL_TO_NODE['B6']: D('2'),
+        LABEL_TO_NODE['B9']: D('2.3')
     },
-    '7': {
-        '8': D('2.1'),
-        '12': D('1.6')
+    LABEL_TO_NODE['B2']: {
+        LABEL_TO_NODE['A3']: D('3.9'),
+        LABEL_TO_NODE['B1']: D('7.5'),
+        LABEL_TO_NODE['B5']: D('3.4'),
+        LABEL_TO_NODE['B6']: D('6.9'),
+        LABEL_TO_NODE['B10']: D('5.5')
     },
-    '8': {
-        '7': D('2.1'),
-        '9': D('2.3'),
-        '11': D('1.6')
+    LABEL_TO_NODE['B3']: {
+        LABEL_TO_NODE['A4']: D('0.4'),
+        LABEL_TO_NODE['B1']: D('1'),
+        LABEL_TO_NODE['B6']: D('1'),
+        LABEL_TO_NODE['B8']: D('1')
     },
-    '9': {
-        '8': D('2.3'),
-        '10': D('2.7')
+    LABEL_TO_NODE['B4']: {
+        LABEL_TO_NODE['A2']: D('3.9'),
+        LABEL_TO_NODE['A3']: D('5.9'),
+        LABEL_TO_NODE['A5']: D('2.3'),
+        LABEL_TO_NODE['B9']: D('2')
     },
-    '10': {
-        '9': D('2.7'),
-        '11': D('2.8')
+    LABEL_TO_NODE['B5']: {
+        LABEL_TO_NODE['A3']: D('3.9'),
+        LABEL_TO_NODE['B1']: D('3.6'),
+        LABEL_TO_NODE['B2']: D('3.4'),
+        LABEL_TO_NODE['B6']: D('4.6'),
+        LABEL_TO_NODE['B9']: D('1')
     },
-    '11': {
-        '1': D('1'),
-        '6': D('1.3'),
-        '8': D('1.6'),
-        '10': D('2.8'),
-        '12': D('2.1')
+    LABEL_TO_NODE['B6']: {
+        LABEL_TO_NODE['B1']: D('2'),
+        LABEL_TO_NODE['B2']: D('6.9'),
+        LABEL_TO_NODE['B3']: D('1'),
+        LABEL_TO_NODE['B5']: D('4.6'),
+        LABEL_TO_NODE['B7']: D('4.6'),
+        LABEL_TO_NODE['B8']: D('2'),
+        LABEL_TO_NODE['B10']: D('1')
     },
-    '12': {
-        '5': D('2.6'),
-        '7': D('1.6'),
-        '11': D('2.1')
+    LABEL_TO_NODE['B7']: {
+        LABEL_TO_NODE['A1']: D('2'),
+        LABEL_TO_NODE['B6']: D('4.6'),
+        LABEL_TO_NODE['B10']: D('4.6')
+    },
+    LABEL_TO_NODE['B8']: {
+        LABEL_TO_NODE['A1']: D('0.4'),
+        LABEL_TO_NODE['B3']: D('1'),
+        LABEL_TO_NODE['B6']: D('2')
+    },
+    LABEL_TO_NODE['B9']: {
+        LABEL_TO_NODE['A3']: D('5.3'),
+        LABEL_TO_NODE['A5']: D('2.3'),
+        LABEL_TO_NODE['B1']: D('2.3'),
+        LABEL_TO_NODE['B4']: D('2'),
+        LABEL_TO_NODE['B5']: D('1')
+    },
+    LABEL_TO_NODE['B10']: {
+        LABEL_TO_NODE['A1']: D('3.6'),
+        LABEL_TO_NODE['B2']: D('5.5'),
+        LABEL_TO_NODE['B6']: D('1'),
+        LABEL_TO_NODE['B7']: D('4.6')
     }
 }
 

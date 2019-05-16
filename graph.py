@@ -22,8 +22,9 @@ logger = Logger()
 
 
 class Graph(object):
-    NODES = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
-    NODES_12 = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12')
+    #        A1   A2   A3   A4   A5   B1   B2   B3   B4   B5    B6    B7    B8    B9    B10
+    NODES = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15')
+    NODES_12 = NODES
 
     def __init__(self, graph, flows, routes={}, auto_build_routes=False):  # change this further like in Route.efficiency()
         # routes = Result('single', 'Маршрути', routes)
@@ -34,19 +35,19 @@ class Graph(object):
         assert self.__is_valid_graph(graph) is True, 'Graph is invalid'
         self.__graph = graph
 
-        assert type(flows) == dict, f'flows must be dict type, not {type(flows)}'
-        assert self.__test_creation_equal_absorption(flows), 'Please, check flows entered. Creation not equal absorbtion'
+        # assert type(flows) == dict, f'flows must be dict type, not {type(flows)}'
+        # assert self.__test_creation_equal_absorption(flows), 'Please, check flows entered. Creation not equal absorbtion'
         self.__flows = flows
 
-        assert type(routes) == dict, f'routes must be dict type, not {type(routes)}'
+        # assert type(routes) == dict, f'routes must be dict type, not {type(routes)}'
 
-        if len(routes.values()) > 0 and (list(routes.values())[0] is not Route):
-            for route_num, route_path in routes.items():
-                routes[route_num] = Route(path=route_path, graph=self, number=route_num)
+        # if len(routes.values()) > 0 and (list(routes.values())[0] is not Route):
+            # for route_num, route_path in routes.items():
+                # routes[route_num] = Route(path=route_path, graph=self, number=route_num)
 
         self.__routes = routes
 
-        assert type(auto_build_routes) == bool, f'auto_build_routes must be bool type, not {type(auto_build_routes)}'
+        # assert type(auto_build_routes) == bool, f'auto_build_routes must be bool type, not {type(auto_build_routes)}'
         self.__auto_build_routes = auto_build_routes
         self.__results = OrderedDict()
 
@@ -770,6 +771,7 @@ class Graph(object):
         self.results.update({'lens': lens})
         self.results.update({'paths': paths})
 
+        """
         #
         # CHAPTER 2
         #
@@ -981,6 +983,7 @@ class Graph(object):
         # CHAPTER 9
         #
         [self.results.update({result.title: result}) for result in self.__routes['1'].calculate_bus_work_modes()]
+        """
 
     # helper functions
 
@@ -1049,6 +1052,7 @@ class Graph(object):
 
                 try:
                     if graph[i][j] != graph[j][i]:
+                        print(f'{i}, {j} ({graph[i][j]}) != {j}, {i} ({graph[j][i]})')
                         return False
 
                 except KeyError:
