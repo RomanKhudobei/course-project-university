@@ -395,65 +395,83 @@ BOOK_FLOWS = {
 """
 
 STAHIV_GRAPH = {
-    '1': {
-        '2': D('1.5'),
-        '10': D('1.3')
+    LABEL_TO_NODE['A1']: {
+        LABEL_TO_NODE['A4']: D('0.9'),
+        LABEL_TO_NODE['A2']: D('7'),
+        LABEL_TO_NODE['B9']: D('7.2'),
+        LABEL_TO_NODE['B10']: D('0.5')
     },
-    '2': {
-        '1': D('1.5'),
-        '3': D('2.4'),
-        '9': D('1.1')
+    LABEL_TO_NODE['A2']: {
+        LABEL_TO_NODE['A1']: D('7'),
+        LABEL_TO_NODE['B3']: D('4.4'),
+        LABEL_TO_NODE['B7']: D('9.1'),
+        LABEL_TO_NODE['B9']: D('5.4'),
+        LABEL_TO_NODE['B10']: D('7.6')
     },
-    '3': {
-        '2': D('2.4'),
-        '4': D('1.6'),
-        '11': D('1.0')
+    LABEL_TO_NODE['A3']: {
+        LABEL_TO_NODE['B3']: D('7.1'),
+        LABEL_TO_NODE['B7']: D('7.4')
     },
-    '4': {
-        '3': D('1.6'),
-        '5': D('2.6')
+    LABEL_TO_NODE['A4']: {
+        LABEL_TO_NODE['A1']: D('0.9'),
+        LABEL_TO_NODE['B4']: D('0.5'),
+        LABEL_TO_NODE['B6']: D('0.7'),
+        LABEL_TO_NODE['B8']: D('1.4')
     },
-    '5': {
-        '4': D('2.6'),
-        '11': D('2.1'),
-        '12': D('1.9')
+    LABEL_TO_NODE['A5']: {
+        LABEL_TO_NODE['B1']: D('1.3'),
+        LABEL_TO_NODE['B5']: D('0.6')
     },
-    '6': {
-        '7': D('2.4'),
-        '12': D('1.3')
+    LABEL_TO_NODE['B1']: {
+        LABEL_TO_NODE['A5']: D('1.3'),
+        LABEL_TO_NODE['B6']: D('4.9'),
+        LABEL_TO_NODE['B7']: D('6.3')
     },
-    '7': {
-        '6': D('2.4'),
-        '8': D('1.8'),
-        '12': D('1.5')
+    LABEL_TO_NODE['B2']: {
+        LABEL_TO_NODE['B4']: D('0.5'),
+        LABEL_TO_NODE['B9']: D('7.8')
     },
-    '8': {
-        '7': D('1.8'),
-        '9': D('1.3'),
-        '11': D('2.5')
+    LABEL_TO_NODE['B3']: {
+        LABEL_TO_NODE['A2']: D('4.4'),
+        LABEL_TO_NODE['A3']: D('7.1')
     },
-    '9': {
-        '2': D('1.1'),
-        '8': D('1.3'),
-        '10': D('1.9'),
-        '11': D('1.6')
+    LABEL_TO_NODE['B4']: {
+        LABEL_TO_NODE['A4']: D('0.5'),
+        LABEL_TO_NODE['B2']: D('0.5')
     },
-    '10': {
-        '1': D('1.3'),
-        '9': D('1.9')
+    LABEL_TO_NODE['B5']: {
+        LABEL_TO_NODE['A5']: D('0.6'),
+        LABEL_TO_NODE['B6']: D('5.2'),
+        LABEL_TO_NODE['B7']: D('7.4'),
+        LABEL_TO_NODE['B8']: D('6.2')
     },
-    '11': {
-        '3': D('1.0'),
-        '5': D('2.1'),
-        '8': D('2.5'),
-        '9': D('1.6'),
-        '12': D('1.5')
+    LABEL_TO_NODE['B6']: {
+        LABEL_TO_NODE['A4']: D('0.7'),
+        LABEL_TO_NODE['B1']: D('4.9'),
+        LABEL_TO_NODE['B5']: D('5.2'),
+        LABEL_TO_NODE['B10']: D('1.5')
     },
-    '12': {
-        '5': D('1.9'),
-        '6': D('1.3'),
-        '7': D('1.5'),
-        '11': D('1.5')
+    LABEL_TO_NODE['B7']: {
+        LABEL_TO_NODE['A2']: D('9.1'),
+        LABEL_TO_NODE['A3']: D('7.4'),
+        LABEL_TO_NODE['B1']: D('6.3'),
+        LABEL_TO_NODE['B5']: D('7.4'),
+        LABEL_TO_NODE['B10']: D('5.2')
+    },
+    LABEL_TO_NODE['B8']: {
+        LABEL_TO_NODE['A4']: D('1.4'),
+        LABEL_TO_NODE['B5']: D('6.2')
+    },
+    LABEL_TO_NODE['B9']: {
+        LABEL_TO_NODE['A1']: D('7.2'),
+        LABEL_TO_NODE['A2']: D('5.4'),
+        LABEL_TO_NODE['B2']: D('7.8')
+    },
+    LABEL_TO_NODE['B10']: {
+        LABEL_TO_NODE['A1']: D('0.5'),
+        LABEL_TO_NODE['A2']: D('7.6'),
+        LABEL_TO_NODE['B6']: D('1.5'),
+        LABEL_TO_NODE['B7']: D('5.2')
     }
 }
 
